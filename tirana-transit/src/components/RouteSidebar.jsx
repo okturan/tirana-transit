@@ -13,43 +13,17 @@ function RouteSidebar({
   onToggleDebug
 }) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('number') // 'number' | 'name' | 'stops'
 
   const filteredRoutes = useMemo(() => {
-    let result = routes
+    if (!searchQuery.trim()) return routes
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim()
-      result = result.filter(route => 
-        route.short_name.toLowerCase().includes(query) ||
-        route.long_name.toLowerCase().includes(query) ||
-        route.route_id.toLowerCase().includes(query)
-      )
-    }
-
-    // Sort routes
-    result = [...result].sort((a, b) => {
-      switch (sortBy) {
-        case 'name': {
-          return a.long_name.localeCompare(b.long_name, 'sq', { sensitivity: 'base' })
-        }
-        case 'stops': {
-          return b.stop_count - a.stop_count
-        }
-        case 'number':
-        default: {
-          // Extract numbers for proper numeric sorting
-          const numA = parseInt(a.short_name.match(/\d+/)?.[0] || 0)
-          const numB = parseInt(b.short_name.match(/\d+/)?.[0] || 0)
-          if (numA !== numB) return numA - numB
-          return a.short_name.localeCompare(b.short_name)
-        }
-      }
-    })
-
-    return result
-  }, [routes, searchQuery, sortBy])
+    const query = searchQuery.toLowerCase().trim()
+    return routes.filter(route => 
+      route.short_name.toLowerCase().includes(query) ||
+      route.long_name.toLowerCase().includes(query) ||
+      route.route_id.toLowerCase().includes(query)
+    )
+  }, [routes, searchQuery])
 
   const selectedCount = selectedRoutes.size
   const totalCount = routes.length
@@ -63,7 +37,7 @@ function RouteSidebar({
         <p>{selectedCount} of {totalCount} lines selected</p>
       </header>
 
-      {/* Search and Filter */}
+      {/* Search */}
       <div className="sidebar-filters">
         <div className="search-box">
           <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -86,15 +60,6 @@ function RouteSidebar({
               ×
             </button>
           )}
-        </div>
-        
-        <div className="sort-controls">
-          <label>Sort by:</label>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="number">Route Number</option>
-            <option value="name">Route Name</option>
-            <option value="stops">Stop Count</option>
-          </select>
         </div>
 
         {searchQuery && (

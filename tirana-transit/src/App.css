@@ -35,13 +35,10 @@
   color: #888;
 }
 
-/* Search and Filter */
+/* Search */
 .sidebar-filters {
   padding: 12px 20px;
   border-bottom: 1px solid #2a2a4e;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .search-box {
@@ -100,29 +97,6 @@
 .search-clear:hover {
   background: #4a4a6e;
   color: #fff;
-}
-
-.sort-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: #888;
-}
-
-.sort-controls select {
-  background: #2a2a4e;
-  border: 1px solid #3a3a5e;
-  border-radius: 4px;
-  color: #ccc;
-  padding: 4px 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.sort-controls select:focus {
-  outline: none;
-  border-color: #646cff;
 }
 
 .filter-status {

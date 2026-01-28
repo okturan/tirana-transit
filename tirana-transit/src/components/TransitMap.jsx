@@ -33,7 +33,7 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       
       // Check if this is a ring (start == end)
       const start = coords[0]
-      const end = coords[-1]
+      const end = coords[coords.length - 1]
       const isRing = start[0] === end[0] && start[1] === end[1]
       
       if (!info[routeId]) {

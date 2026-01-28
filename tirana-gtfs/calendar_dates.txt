@@ -44,9 +44,6 @@ service_id,date,exception_type
 2026-after-summer-holiday_sunday,20261225,1
 2026-after-summer-holiday_weekend,20261225,1
 2026-after-summer-short-holiday_saturday,20261225,1
-2026-off-summer-holiday_0101_0102,20260102,1
-2026-off-summer-holiday_0102,20260102,1
-2026-off-summer-holiday_0103,20260103,1
 2026-after-summer-all,20261130,2
 2026-after-summer-short-normal,20261130,2
 2026-after-summer-monday,20261130,2

@@ -55,9 +55,13 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     const mode = {}
     const { corridorGroups, routeCorridor } = corridorInfo
     
+    console.log('routeCorridor:', Object.keys(routeCorridor).slice(0, 5))
+    console.log('selectedRoutes:', Array.from(selectedRoutes).slice(0, 5))
+    
     // For each selected route, check if it's alone in its corridor
     selectedRoutes.forEach(routeId => {
       const info = routeCorridor[routeId]
+      console.log(`Route ${routeId}:`, { info: info?.group })
       if (!info || !info.group) {
         // Route not in a corridor, always show its offset
         mode[routeId] = 'offset'
@@ -72,6 +76,8 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       
       // Count how many routes from this corridor are visible
       const visibleInCorridor = group.filter(r => selectedRoutes.has(r.routeId)).length
+      
+      console.log(`Route ${routeId} in ${info.group}: visible=${visibleInCorridor}, total=${group.length}`)
       
       // If alone in corridor, use centerline
       // If multiple visible, use offset
@@ -93,6 +99,11 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       
       const isDebug = f.properties.debug
       const mode = routeDisplayMode[routeId]
+      
+      // DEBUG
+      if (f.properties.route_short_name === '3C') {
+        console.log('3C:', { routeId, isDebug, mode, selectedSize: selectedRoutes.size })
+      }
       
       // Include if:
       // - it's an offset line (debug=false) and we want offset

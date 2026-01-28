@@ -21,6 +21,39 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     return info
   }, [routes])
 
+  // Build route info including whether it's a ring route
+  const enhancedRouteInfo = useMemo(() => {
+    if (!routesGeoJSON) return {}
+    
+    const info = {}
+    
+    routesGeoJSON.features.forEach(f => {
+      const routeId = f.properties.route_id
+      const coords = f.geometry.coordinates
+      
+      // Check if this is a ring (start == end)
+      const start = coords[0]
+      const end = coords[-1]
+      const isRing = start[0] === end[0] && start[1] === end[1]
+      
+      if (!info[routeId]) {
+        info[routeId] = {
+          isRing,
+          hasOffsetFeature: false,
+          hasDebugFeature: false
+        }
+      }
+      
+      if (f.properties.debug) {
+        info[routeId].hasDebugFeature = true
+      } else {
+        info[routeId].hasOffsetFeature = true
+      }
+    })
+    
+    return info
+  }, [routesGeoJSON])
+
   // Build corridor info from features
   const corridorInfo = useMemo(() => {
     if (!routesGeoJSON) return { corridorGroups: {}, routeCorridor: {} }
@@ -38,59 +71,47 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       
       if (group) {
         if (!corridorGroups[group]) corridorGroups[group] = []
-        // Store unique routes per corridor
         if (!corridorGroups[group].find(r => r.routeId === routeId)) {
           corridorGroups[group].push({ routeId, offset })
         }
       }
     })
     
-    console.log('corridor_1 routes:', corridorGroups['corridor_1']?.map(r => r.routeId))
-    console.log('routeCorridor[4] (3B):', routeCorridor['4'])
-    console.log('routeCorridor[47] (3C):', routeCorridor['47'])
-    
     return { corridorGroups, routeCorridor }
   }, [routesGeoJSON])
 
   // Determine which geometry to use for each route
-  // If a route is alone in its corridor, use centerline (debug)
-  // If multiple routes from same corridor are visible, use offset
   const routeDisplayMode = useMemo(() => {
     const mode = {}
     const { corridorGroups, routeCorridor } = corridorInfo
     
-    console.log('corridor_1 group:', corridorGroups['corridor_1'])
-    
-    // For each selected route, check if it's alone in its corridor
     selectedRoutes.forEach(routeId => {
-      const info = routeCorridor[routeId]
+      const routeMeta = enhancedRouteInfo[routeId]
+      const corridorMeta = routeCorridor[routeId]
       
-      console.log(`Route ${routeId}: info=`, info)
+      // Ring routes always use centerline (debug) to avoid offset artifacts
+      if (routeMeta?.isRing) {
+        mode[routeId] = 'center'
+        return
+      }
       
-      if (!info || !info.group) {
-        // Route not in a corridor, always show its offset
+      if (!corridorMeta || !corridorMeta.group) {
         mode[routeId] = 'offset'
         return
       }
       
-      const group = corridorGroups[info.group]
+      const group = corridorGroups[corridorMeta.group]
       if (!group) {
         mode[routeId] = 'offset'
         return
       }
       
-      // Count how many routes from this corridor are visible
       const visibleInCorridor = group.filter(r => selectedRoutes.has(r.routeId)).length
-      
-      console.log(`Route ${routeId} in ${info.group}: visible=${visibleInCorridor}, total=${group.length}`)
-      
-      // If alone in corridor, use centerline
-      // If multiple visible, use offset
       mode[routeId] = visibleInCorridor === 1 ? 'center' : 'offset'
     })
     
     return mode
-  }, [corridorInfo, selectedRoutes])
+  }, [corridorInfo, enhancedRouteInfo, selectedRoutes])
 
   // Build filtered routes
   const filteredRoutes = useMemo(() => {
@@ -98,27 +119,14 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     
     const features = []
     
-    console.log('Building filtered routes, selected:', Array.from(selectedRoutes).slice(0,5))
-    console.log('routeDisplayMode:', routeDisplayMode)
-    
     routesGeoJSON.features.forEach(f => {
       const routeId = f.properties.route_id
-      const shortName = f.properties.route_short_name
       if (!selectedRoutes.has(routeId)) return
       
       const isDebug = f.properties.debug
       const mode = routeDisplayMode[routeId]
       
-      const shouldInclude = (mode === 'offset' && !isDebug) || (mode === 'center' && isDebug)
-      
-      if (shortName === '3B' || shortName === '3C') {
-        console.log(`${shortName} (id=${routeId}): debug=${isDebug}, mode=${mode}, include=${shouldInclude}, points=${f.geometry.coordinates.length}`)
-      }
-      
-      // Include if:
-      // - it's an offset line (debug=false) and we want offset
-      // - it's a center line (debug=true) and we want center
-      if (shouldInclude) {
+      if ((mode === 'offset' && !isDebug) || (mode === 'center' && isDebug)) {
         features.push(f)
       }
     })
@@ -145,7 +153,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       if (coords.length < 2) return
 
       const props = f.properties
-      // Start point
       features.push({
         type: 'Feature',
         properties: {
@@ -158,7 +165,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
           coordinates: coords[0]
         }
       })
-      // End point
       features.push({
         type: 'Feature',
         properties: {
@@ -191,7 +197,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
   const onMapLoad = (e) => {
     const map = e.target
 
-    // Create a chevron/arrow image for direction indicators
     const arrowSize = 24
     const arrowCanvas = document.createElement('canvas')
     arrowCanvas.width = arrowSize
@@ -214,15 +219,12 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     })
     setArrowImageLoaded(true)
 
-    // Create bus stop icon
     const stopSize = 32
     const stopCanvas = document.createElement('canvas')
     stopCanvas.width = stopSize
     stopCanvas.height = stopSize
     const stopCtx = stopCanvas.getContext('2d')
 
-    // Draw bus stop sign (circle with bus icon)
-    // Outer circle - dark background
     stopCtx.beginPath()
     stopCtx.arc(16, 16, 14, 0, Math.PI * 2)
     stopCtx.fillStyle = '#1a1a2e'
@@ -231,17 +233,12 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     stopCtx.lineWidth = 2
     stopCtx.stroke()
 
-    // Draw simple bus shape
     stopCtx.fillStyle = '#fff'
-    // Bus body
     stopCtx.fillRect(8, 10, 16, 10)
-    // Roof
     stopCtx.fillRect(10, 8, 12, 3)
-    // Windows
     stopCtx.fillStyle = '#1a1a2e'
     stopCtx.fillRect(10, 11, 4, 4)
     stopCtx.fillRect(16, 11, 4, 4)
-    // Wheels
     stopCtx.fillStyle = '#fff'
     stopCtx.beginPath()
     stopCtx.arc(11, 21, 2, 0, Math.PI * 2)
@@ -257,7 +254,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     })
     setBusStopImageLoaded(true)
 
-    // Change cursor on hover for routes (pointer) and stops (default)
     map.on('mouseenter', 'route-lines', () => {
       map.getCanvas().style.cursor = 'pointer'
     })
@@ -294,7 +290,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
         direction: props.direction
       })
     } else {
-      // Check stops
       const stopFeatures = map.queryRenderedFeatures(e.point, {
         layers: ['stops-icon']
       })
@@ -321,7 +316,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     }
   }
 
-
   return (
     <Map
       ref={mapRef}
@@ -336,7 +330,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       onLoad={onMapLoad}
       interactiveLayerIds={['route-lines', 'stops-icon']}
     >
-      {/* Debug routes (original unmodified lines) */}
       {showDebug && (
         <Source id="debug-routes" type="geojson" data={debugRoutes}>
           <Layer
@@ -356,9 +349,7 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
         </Source>
       )}
 
-      {/* Route lines */}
       <Source id="routes" type="geojson" data={filteredRoutes}>
-        {/* Main route line */}
         <Layer
           id="route-lines"
           type="line"
@@ -379,7 +370,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
           }}
         />
 
-        {/* Direction arrows along the line */}
         {arrowImageLoaded && (
           <Layer
             id="route-arrows"
@@ -406,9 +396,7 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
         )}
       </Source>
 
-      {/* Terminal points (start/end) */}
       <Source id="terminals" type="geojson" data={terminalPoints}>
-        {/* Start terminals - small filled circles */}
         <Layer
           id="terminal-start"
           type="circle"
@@ -425,7 +413,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
             'circle-stroke-color': '#fff'
           }}
         />
-        {/* End terminals - white circles with colored border */}
         <Layer
           id="terminal-end-outer"
           type="circle"
@@ -442,7 +429,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
             'circle-stroke-color': ['get', 'route_color']
           }}
         />
-        {/* End terminals - inner dot */}
         <Layer
           id="terminal-end-inner"
           type="circle"
@@ -459,7 +445,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
         />
       </Source>
 
-      {/* Stops */}
       {showStops && busStopImageLoaded && (
         <Source id="stops" type="geojson" data={filteredStops}>
           <Layer
@@ -479,7 +464,6 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
         </Source>
       )}
 
-      {/* Popup */}
       {popupInfo && (
         <Popup
           longitude={popupInfo.longitude}

@@ -48,73 +48,118 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     return { corridorGroups, routeCorridor }
   }, [routesGeoJSON])
 
-  // Determine which geometry to use for each route
-  // If a route is alone in its corridor, use centerline (debug)
-  // If multiple routes from same corridor are visible, use offset
-  const routeDisplayMode = useMemo(() => {
-    const mode = {}
+  // Determine dynamic offset for each route
+  // When routes from same corridor are visible, spread them evenly
+  // rather than using fixed positions from the full corridor
+  const dynamicOffsets = useMemo(() => {
+    const offsets = {}
     const { corridorGroups, routeCorridor } = corridorInfo
     
-    console.log('routeCorridor:', Object.keys(routeCorridor).slice(0, 5))
-    console.log('selectedRoutes:', Array.from(selectedRoutes).slice(0, 5))
-    
-    // For each selected route, check if it's alone in its corridor
-    selectedRoutes.forEach(routeId => {
-      const info = routeCorridor[routeId]
-      console.log(`Route ${routeId}:`, { info: info?.group })
-      if (!info || !info.group) {
-        // Route not in a corridor, always show its offset
-        mode[routeId] = 'offset'
-        return
+    // Process each corridor
+    Object.entries(corridorGroups).forEach(([, routes]) => {
+      // Which routes from this corridor are visible?
+      const visibleRoutes = routes.filter(r => selectedRoutes.has(r.routeId))
+      
+      if (visibleRoutes.length === 0) return
+      
+      if (visibleRoutes.length === 1) {
+        // Only one route visible - center it (0 offset)
+        offsets[visibleRoutes[0].routeId] = 0
+      } else {
+        // Multiple routes visible - spread them evenly
+        // Sort by original offset to maintain relative order
+        visibleRoutes.sort((a, b) => a.offset - b.offset)
+        
+        const spacing = 6 // meters between visible routes
+        const totalWidth = (visibleRoutes.length - 1) * spacing
+        const startOffset = -totalWidth / 2
+        
+        visibleRoutes.forEach((route, index) => {
+          offsets[route.routeId] = startOffset + (index * spacing)
+        })
       }
-      
-      const group = corridorGroups[info.group]
-      if (!group) {
-        mode[routeId] = 'offset'
-        return
-      }
-      
-      // Count how many routes from this corridor are visible
-      const visibleInCorridor = group.filter(r => selectedRoutes.has(r.routeId)).length
-      
-      console.log(`Route ${routeId} in ${info.group}: visible=${visibleInCorridor}, total=${group.length}`)
-      
-      // If alone in corridor, use centerline
-      // If multiple visible, use offset
-      mode[routeId] = visibleInCorridor === 1 ? 'center' : 'offset'
     })
     
-    return mode
+    // Routes not in any corridor keep their original offset
+    selectedRoutes.forEach(routeId => {
+      if (!(routeId in offsets)) {
+        const info = routeCorridor[routeId]
+        offsets[routeId] = info?.offset || 0
+      }
+    })
+    
+    return offsets
   }, [corridorInfo, selectedRoutes])
 
-  // Build filtered routes
+  // Build filtered routes with dynamic offsets
   const filteredRoutes = useMemo(() => {
     if (!routesGeoJSON) return { type: 'FeatureCollection', features: [] }
     
     const features = []
     
+    // Group features by route
+    const featuresByRoute = {}
     routesGeoJSON.features.forEach(f => {
       const routeId = f.properties.route_id
       if (!selectedRoutes.has(routeId)) return
       
-      const isDebug = f.properties.debug
-      const mode = routeDisplayMode[routeId]
-      
-      // DEBUG
-      if (f.properties.route_short_name === '3C') {
-        console.log('3C:', { routeId, isDebug, mode, selectedSize: selectedRoutes.size })
+      if (!featuresByRoute[routeId]) {
+        featuresByRoute[routeId] = { offset: null, center: null }
       }
       
-      // Include if:
-      // - it's an offset line (debug=false) and we want offset
-      // - it's a center line (debug=true) and we want center
-      if ((mode === 'offset' && !isDebug) || (mode === 'center' && isDebug)) {
-        features.push(f)
+      if (f.properties.debug) {
+        featuresByRoute[routeId].center = f
+      } else {
+        featuresByRoute[routeId].offset = f
+      }
+    })
+    
+    // Process each route
+    Object.entries(featuresByRoute).forEach(([routeId, { offset, center }]) => {
+      const targetOffset = dynamicOffsets[routeId] || 0
+      const originalOffset = offset?.properties?.offset_meters || 0
+      
+      if (!offset || !center) {
+        // Only have one version, use what's available
+        if (offset) features.push(offset)
+        else if (center) features.push(center)
+        return
+      }
+      
+      if (Math.abs(targetOffset - originalOffset) < 0.5) {
+        // Target is close to pre-calculated offset, use it
+        features.push(offset)
+      } else if (Math.abs(targetOffset) < 0.5) {
+        // Target is center, use centerline
+        features.push(center)
+      } else {
+        // Need to interpolate between center and offset
+        const t = targetOffset / originalOffset // interpolation factor
+        const interpolatedCoords = offset.geometry.coordinates.map((point, i) => {
+          const centerPoint = center.geometry.coordinates[i]
+          if (!centerPoint) return point
+          return [
+            centerPoint[0] + (point[0] - centerPoint[0]) * t,
+            centerPoint[1] + (point[1] - centerPoint[1]) * t
+          ]
+        })
+        
+        features.push({
+          ...offset,
+          geometry: {
+            ...offset.geometry,
+            coordinates: interpolatedCoords
+          },
+          properties: {
+            ...offset.properties,
+            dynamic_offset: targetOffset
+          }
+        })
       }
     })
     
     return { type: 'FeatureCollection', features }
-  }, [routesGeoJSON, selectedRoutes, routeDisplayMode])
+  }, [routesGeoJSON, selectedRoutes, dynamicOffsets])
 
   // Debug routes (original unmodified lines) - only when explicitly enabled
   const debugRoutes = useMemo(() => {

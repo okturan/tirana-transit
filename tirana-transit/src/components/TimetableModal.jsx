@@ -1,13 +1,23 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 function TimetableModal({ route, onClose }) {
+  // Determine available day types from the route's schedules
+  const availableDayTypes = useMemo(() => {
+    if (!route) return []
+    const days = new Set()
+    Object.keys(route.schedules || {}).forEach(key => {
+      const dayPart = key.split('_')[1]
+      if (dayPart) days.add(dayPart)
+    })
+    return Array.from(days).sort()
+  }, [route])
+
   const [activeDirection, setActiveDirection] = useState('0')
-  const [activeDay, setActiveDay] = useState('Weekdays')
+  const [activeDay, setActiveDay] = useState(() => availableDayTypes[0] || 'Weekdays')
 
   if (!route) return null
 
   const { schedules, directions } = route
-  const dayTypes = ['Weekdays', 'Saturday', 'Sunday']
 
   // Get times for current selection
   const key = `${activeDirection}_${activeDay}`
@@ -22,9 +32,12 @@ function TimetableModal({ route, onClose }) {
   })
 
   const directionNames = {
-    '0': directions['0'] || 'Direction A',
-    '1': directions['1'] || 'Direction B'
+    '0': directions?.['0'] || 'Direction A',
+    '1': directions?.['1'] || 'Direction B'
   }
+
+  // Check if route has both directions
+  const hasBothDirections = directions && directions['1']
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -45,7 +58,7 @@ function TimetableModal({ route, onClose }) {
 
         <div className="modal-body">
           {/* Direction selector */}
-          {directions['1'] && (
+          {hasBothDirections && (
             <div className="direction-selector">
               <button
                 className={`direction-btn ${activeDirection === '0' ? 'active' : ''}`}
@@ -62,18 +75,20 @@ function TimetableModal({ route, onClose }) {
             </div>
           )}
 
-          {/* Day type selector */}
-          <div className="day-selector">
-            {dayTypes.map(day => (
-              <button
-                key={day}
-                className={`day-btn ${activeDay === day ? 'active' : ''}`}
-                onClick={() => setActiveDay(day)}
-              >
-                {day}
-              </button>
-            ))}
-          </div>
+          {/* Day type selector - only show available days */}
+          {availableDayTypes.length > 0 && (
+            <div className="day-selector">
+              {availableDayTypes.map(day => (
+                <button
+                  key={day}
+                  className={`day-btn ${activeDay === day ? 'active' : ''}`}
+                  onClick={() => setActiveDay(day)}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Timetable */}
           <div className="timetable">

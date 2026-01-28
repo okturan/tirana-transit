@@ -469,6 +469,8 @@ for cal in calendar:
 
     if days == ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']:
         pattern = 'Weekdays'
+    elif days == ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']:
+        pattern = 'Daily'
     elif days == ['Sat']:
         pattern = 'Saturday'
     elif days == ['Sun']:

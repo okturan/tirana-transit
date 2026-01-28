@@ -977,7 +977,7 @@
         "22:04",
         "22:26"
       ],
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:30",
         "05:52",
         "06:14",
@@ -1098,7 +1098,7 @@
         "22:04",
         "22:26"
       ],
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:30",
         "05:53",
         "06:16",
@@ -1304,7 +1304,7 @@
         "22:45",
         "23:30"
       ],
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:00",
         "05:30",
         "06:00",
@@ -1342,7 +1342,7 @@
         "22:00",
         "23:00"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "05:30",
         "06:15",
         "06:45",
@@ -2196,7 +2196,7 @@
         "22:20",
         "22:45"
       ],
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:00",
         "05:20",
         "05:40",
@@ -2275,7 +2275,7 @@
         "22:35",
         "23:35"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "05:40",
         "05:55",
         "06:10",
@@ -3892,7 +3892,7 @@
     "stop_count": 38,
     "has_both_directions": true,
     "schedules": {
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:30",
         "06:00",
         "06:30",
@@ -3927,7 +3927,7 @@
         "21:00",
         "21:30"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "06:15",
         "06:45",
         "07:15",
@@ -3978,7 +3978,7 @@
     "stop_count": 36,
     "has_both_directions": true,
     "schedules": {
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:45",
         "06:15",
         "06:45",
@@ -4013,7 +4013,7 @@
         "21:45",
         "22:15"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "06:30",
         "07:00",
         "07:30",
@@ -4064,7 +4064,7 @@
     "stop_count": 25,
     "has_both_directions": true,
     "schedules": {
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "05:30",
         "06:30",
         "07:30",
@@ -4084,7 +4084,7 @@
         "21:30",
         "22:30"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "06:00",
         "07:00",
         "08:00",
@@ -4120,7 +4120,7 @@
     "stop_count": 24,
     "has_both_directions": true,
     "schedules": {
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "06:00",
         "07:00",
         "08:00",
@@ -4139,7 +4139,7 @@
         "21:00",
         "22:00"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "06:30",
         "07:30",
         "08:30",
@@ -4174,7 +4174,7 @@
     "stop_count": 36,
     "has_both_directions": true,
     "schedules": {
-      "0_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "0_Daily": [
         "06:00",
         "06:30",
         "07:00",
@@ -4208,7 +4208,7 @@
         "21:00",
         "21:30"
       ],
-      "1_Mon, Tue, Wed, Thu, Fri, Sat, Sun": [
+      "1_Daily": [
         "07:00",
         "07:30",
         "08:00",

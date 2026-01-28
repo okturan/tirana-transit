@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+tirana-transit/node_modules/
+tirana-gtfs/venv/
+
+# Build outputs
+dist/
+tirana-transit/dist/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db

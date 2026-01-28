@@ -1,0 +1,23 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Generated GeoJSON files (source of truth is in tirana-transit/public/)
+# Uncomment if you want to ignore generated files here
+# *.geojson
+# route_metadata.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

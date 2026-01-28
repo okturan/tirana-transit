@@ -3627,7 +3627,7 @@
       "0": "nga 9 Kat\u00ebshet B deri ne Terminali Juglindor",
       "1": "nga Terminali Juglindor deri ne 9 Kat\u00ebshet B"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "11",
@@ -3755,7 +3755,7 @@
       "0": "nga 9 Kat\u00ebshet B deri ne Sanatorium",
       "1": "nga Sanatorium deri ne 9 Kat\u00ebshet B"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "12",
@@ -3881,7 +3881,7 @@
       "0": "nga 9 Kat\u00ebshet B deri ne Sauk i Vjeter",
       "1": "nga Sauk i Vjeter deri ne 9 Kat\u00ebshet B"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "13",
@@ -3967,7 +3967,7 @@
       "0": "nga Depo Ujit A deri ne Uzina Dinamo",
       "1": "nga Uzina Dinamo deri ne Depo Ujit A"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "14",
@@ -4053,7 +4053,7 @@
       "0": "nga Binak Alia deri ne Uzina Dinamo",
       "1": "nga Uzina Dinamo deri ne Binak Alia"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "15",
@@ -4109,7 +4109,7 @@
       "0": "nga Depo Ujit B deri ne Dollari B",
       "1": "nga Dollari B deri ne Depo Ujit B"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "16",
@@ -4163,7 +4163,7 @@
       "0": "nga \u00c7ollak\u00ebt deri ne Dollari B",
       "1": "nga Dollari B deri ne \u00c7ollak\u00ebt"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "17",
@@ -4247,7 +4247,7 @@
       "0": "nga Shkoz\u00eb deri ne Dhora Leka",
       "1": "nga Dhora Leka deri ne Shkoz\u00eb"
     },
-    "corridor_group": "corridor_2"
+    "corridor_group": "corridor_3"
   },
   {
     "route_id": "18",
@@ -6750,7 +6750,7 @@
     "directions": {
       "0": "Tirana e re Orar"
     },
-    "corridor_group": "corridor_1"
+    "corridor_group": "corridor_2"
   },
   {
     "route_id": "20",
@@ -7257,7 +7257,7 @@
     "directions": {
       "0": "Tirana e re Antiorar"
     },
-    "corridor_group": "corridor_1"
+    "corridor_group": "corridor_2"
   },
   {
     "route_id": "22",
@@ -9235,7 +9235,7 @@
     "directions": {
       "0": "Linja e gjelb\u00ebr Orar"
     },
-    "corridor_group": "corridor_3"
+    "corridor_group": "corridor_4"
   },
   {
     "route_id": "24",
@@ -9771,6 +9771,6 @@
     "directions": {
       "0": "Linja e gjelb\u00ebr Antiorar"
     },
-    "corridor_group": "corridor_3"
+    "corridor_group": "corridor_4"
   }
 ]

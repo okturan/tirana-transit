@@ -163,6 +163,29 @@ def detect_corridor_groups(shape_geometries, route_to_shapes, route_short_names)
     for base, members in sorted(family_groups.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
         if len(members) > 1:
             print(f"  Family {base}: {members}")
+    
+    # Identify ring route families (circular routes that start/end at same point)
+    # These should stay in their own family group, not merge with others
+    ring_families = set()
+    for base, members in family_groups.items():
+        if len(members) >= 2:
+            # Check if all members of this family are rings (start == end)
+            all_rings = True
+            for name in members:
+                for shape_coords in route_shapes.get(name, []):
+                    if len(shape_coords) > 1:
+                        start = shape_coords[0]
+                        end = shape_coords[-1]
+                        # If start and end are very close, it's a ring
+                        dist_sq = (start[0] - end[0])**2 + (start[1] - end[1])**2
+                        if dist_sq > 1e-10:  # More than ~1m apart
+                            all_rings = False
+                            break
+                if not all_rings:
+                    break
+            if all_rings:
+                ring_families.add(base)
+                print(f"  -> Ring family detected: {base} ({members})")
 
     # Build corridor groups using union-find
     parent = {name: name for name in route_names}
@@ -188,10 +211,15 @@ def detect_corridor_groups(shape_geometries, route_to_shapes, route_short_names)
     print("\nCross-family corridor sharing:")
 
     # Only compare routes from DIFFERENT families
+    # Skip ring families - they stay in their own group for proper opposite-side offsetting
     bases = list(family_groups.keys())
     for i, base1 in enumerate(bases):
         for j, base2 in enumerate(bases):
             if i >= j:
+                continue
+            
+            # Skip if either family is a ring family
+            if base1 in ring_families or base2 in ring_families:
                 continue
 
             # Check if any route from family1 shares corridor with any route from family2
@@ -292,13 +320,15 @@ def offset_line_geographic(coords, offset_meters):
     end = coords[-1]
     is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001  # ~10m threshold
 
-    if is_ring:
-        # For ring roads, don't offset - parallel_offset breaks rings badly
-        # Just return original coordinates
+    # For rings, remove the duplicate end point to make it a line
+    # parallel_offset works better on open lines
+    working_coords = coords[:-1] if is_ring else coords
+
+    if len(working_coords) < 2:
         return coords
 
     try:
-        line = LineString(coords)
+        line = LineString(working_coords)
         line_utm = transform(to_utm, line)
 
         distance = abs(offset_meters)
@@ -324,7 +354,7 @@ def offset_line_geographic(coords, offset_meters):
         result_coords = list(offset_line.coords)
 
         # Check if reversal needed (parallel_offset can reverse direction)
-        original_start = coords[0]
+        original_start = working_coords[0]
         result_start = result_coords[0]
         result_end = result_coords[-1]
 
@@ -506,6 +536,13 @@ for route in routes:
 
             # Calculate offset (negative = right side of road)
             total_offset = get_offset_for_shape(short_name, direction, corridor_assignments)
+            
+            # For ring routes (circular routes like 13A/13B, 16A/16B):
+            # If route name ends with 'B' or contains 'Antiorar', it's the reverse direction
+            # Flip the offset so A and B appear on opposite sides of the road
+            long_name = route.get('route_long_name', '').lower()
+            if short_name.endswith('B') or 'antiorar' in long_name:
+                total_offset = -total_offset
 
             if total_offset != 0:
                 coords = offset_line_geographic(original_coords, total_offset)

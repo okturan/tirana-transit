@@ -326,7 +326,8 @@ def offset_line_geographic(coords, offset_meters):
 
     # For rings, remove the duplicate end point to make it a line
     # parallel_offset works better on open lines
-    working_coords = coords[:-1] if is_ring else coords
+    # IMPORTANT: Make a copy to avoid modifying the original list
+    working_coords = coords[:-1] if is_ring else list(coords)
 
     if len(working_coords) < 2:
         return coords

@@ -162,6 +162,7 @@ function App() {
         onShowTimetable={showTimetable}
         showDebug={showDebug}
         onToggleDebug={() => setShowDebug(!showDebug)}
+        useCenterline={selectedRoutes.size === 1}
       />
       <div className="map-container">
         <ErrorBoundary fallback={<div className="map-error">Map failed to load. Please refresh the page.</div>}>

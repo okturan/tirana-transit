@@ -35,6 +35,13 @@
   color: #888;
 }
 
+.centerline-hint {
+  font-size: 0.75rem;
+  color: #646cff;
+  font-style: italic;
+  margin-top: 4px;
+}
+
 .sidebar-controls {
   padding: 12px 20px;
   display: flex;

@@ -83,9 +83,13 @@ to_wgs84 = pyproj.Transformer.from_crs(utm34n, wgs84, always_xy=True).transform
 # Albania has RIGHT-HAND traffic (steering wheel on left, drive on right)
 # So buses travel on the RIGHT side of the road in their direction of travel
 # We use NEGATIVE offset (Shapely's 'right' side) to position lines correctly
-BASE_OFFSET = 6  # meters - puts line on correct side of road
-OFFSET_PER_ROUTE = 6  # meters - offset between adjacent routes in a corridor group
-MAX_TOTAL_OFFSET = 30  # meters - cap total offset to avoid routes going too far
+# 
+# REDUCED OFFSETS for better visual appearance:
+# Previous values (6m base + 6m per route) created too much spread for big corridors
+# New values keep routes closer to road center while maintaining visibility
+BASE_OFFSET = 4  # meters - puts line on correct side of road (was 6m)
+OFFSET_PER_ROUTE = 5  # meters - offset between adjacent routes (was 6m)
+MAX_TOTAL_OFFSET = 20  # meters - cap total offset (was 30m)
 PROXIMITY_THRESHOLD = 35  # meters - detection threshold for shared corridors
 CROSS_FAMILY_THRESHOLD = 0.40  # 40% - high threshold for cross-family corridor detection
 

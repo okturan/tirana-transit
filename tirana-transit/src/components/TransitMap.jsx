@@ -7,41 +7,6 @@ const TIRANA_CENTER = { longitude: 19.8187, latitude: 41.3275 }
 const DEFAULT_ZOOM = 12
 const MAX_ZOOM = 19
 
-// Calculate perpendicular offset between two points
-function getPerpendicularVector(p1, p2, distance) {
-  const dx = p2[0] - p1[0]
-  const dy = p2[1] - p1[1]
-  const len = Math.sqrt(dx * dx + dy * dy)
-  if (len === 0) return [0, 0]
-  // Perpendicular (90 degrees) - rotate (dx, dy) to (-dy, dx) for right side
-  // Normalize and scale by distance (in degrees, approximate)
-  return [(-dy / len) * (distance / 111000), (dx / len) * (distance / 111000)]
-}
-
-// Apply dynamic offset to coordinates
-function applyDynamicOffset(coords, targetOffset, originalOffset) {
-  if (!coords || coords.length < 2 || targetOffset === originalOffset) {
-    return coords
-  }
-  
-  return coords.map((point, i) => {
-    if (i === 0) {
-      // First point - use vector from first to second
-      const vec = getPerpendicularVector(point, coords[1], targetOffset)
-      return [point[0] + vec[0], point[1] + vec[1]]
-    } else if (i === coords.length - 1) {
-      // Last point - use vector from second-to-last to last
-      const vec = getPerpendicularVector(coords[i - 1], point, targetOffset)
-      return [point[0] + vec[0], point[1] + vec[1]]
-    } else {
-      // Middle points - average of vectors from prev and to next
-      const vec1 = getPerpendicularVector(coords[i - 1], point, targetOffset)
-      const vec2 = getPerpendicularVector(point, coords[i + 1], targetOffset)
-      return [point[0] + (vec1[0] + vec2[0]) / 2, point[1] + (vec1[1] + vec2[1]) / 2]
-    }
-  })
-}
-
 function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, routes, showDebug }) {
   const mapRef = useRef(null)
   const [popupInfo, setPopupInfo] = useState(null)
@@ -58,124 +23,89 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
 
   // Build corridor info from features
   const corridorInfo = useMemo(() => {
-    if (!routesGeoJSON) return {}
+    if (!routesGeoJSON) return { corridorGroups: {}, routeCorridor: {} }
     
-    const info = {}
-    // Group routes by corridor
+    const routeCorridor = {}
     const corridorGroups = {}
     
     routesGeoJSON.features.forEach(f => {
       if (f.properties.debug) return
       const group = f.properties.corridor_group
       const routeId = f.properties.route_id
-      const shortName = f.properties.route_short_name
       const offset = f.properties.offset_meters
       
-      if (!info[routeId]) {
-        info[routeId] = {
-          shortName,
-          corridorGroup: group,
-          originalOffset: offset,
-          features: []
-        }
-      }
-      info[routeId].features.push(f)
+      routeCorridor[routeId] = { group, offset }
       
       if (group) {
         if (!corridorGroups[group]) corridorGroups[group] = []
+        // Store unique routes per corridor
         if (!corridorGroups[group].find(r => r.routeId === routeId)) {
-          corridorGroups[group].push({ routeId, shortName, offset })
+          corridorGroups[group].push({ routeId, offset })
         }
       }
     })
     
-    return { routeInfo: info, corridorGroups }
+    return { corridorGroups, routeCorridor }
   }, [routesGeoJSON])
 
-  // Calculate dynamic offsets based on visible routes per corridor
-  const dynamicOffsets = useMemo(() => {
-    const offsets = {}
-    const { corridorGroups } = corridorInfo
+  // Determine which geometry to use for each route
+  // If a route is alone in its corridor, use centerline (debug)
+  // If multiple routes from same corridor are visible, use offset
+  const routeDisplayMode = useMemo(() => {
+    const mode = {}
+    const { corridorGroups, routeCorridor } = corridorInfo
     
-    if (!corridorGroups) return offsets
-    
-    Object.values(corridorGroups).forEach((routes) => {
-      // Which routes from this corridor are visible?
-      const visibleRoutes = routes.filter(r => selectedRoutes.has(r.routeId))
-      const totalVisible = visibleRoutes.length
-      
-      if (totalVisible === 0) return
-      
-      if (totalVisible === 1) {
-        // Only one route visible - center it
-        offsets[visibleRoutes[0].routeId] = 0
-      } else {
-        // Multiple routes visible - spread them evenly
-        // Sort by original offset to maintain relative order
-        visibleRoutes.sort((a, b) => a.offset - b.offset)
-        
-        const spacing = 8 // meters between visible routes
-        const totalWidth = (totalVisible - 1) * spacing
-        const startOffset = -totalWidth / 2
-        
-        visibleRoutes.forEach((route, index) => {
-          offsets[route.routeId] = startOffset + (index * spacing)
-        })
+    // For each selected route, check if it's alone in its corridor
+    selectedRoutes.forEach(routeId => {
+      const info = routeCorridor[routeId]
+      if (!info || !info.group) {
+        // Route not in a corridor, always show its offset
+        mode[routeId] = 'offset'
+        return
       }
+      
+      const group = corridorGroups[info.group]
+      if (!group) {
+        mode[routeId] = 'offset'
+        return
+      }
+      
+      // Count how many routes from this corridor are visible
+      const visibleInCorridor = group.filter(r => selectedRoutes.has(r.routeId)).length
+      
+      // If alone in corridor, use centerline
+      // If multiple visible, use offset
+      mode[routeId] = visibleInCorridor === 1 ? 'center' : 'offset'
     })
     
-    // Routes not in any corridor keep their original offset
-    Object.keys(corridorInfo.routeInfo || {}).forEach(routeId => {
-      if (!(routeId in offsets)) {
-        offsets[routeId] = corridorInfo.routeInfo[routeId].originalOffset
-      }
-    })
-    
-    return offsets
+    return mode
   }, [corridorInfo, selectedRoutes])
 
-  // Build filtered routes with dynamic offsets
+  // Build filtered routes
   const filteredRoutes = useMemo(() => {
     if (!routesGeoJSON) return { type: 'FeatureCollection', features: [] }
     
     const features = []
     
     routesGeoJSON.features.forEach(f => {
-      if (f.properties.debug) return
-      if (!selectedRoutes.has(f.properties.route_id)) return
-      
       const routeId = f.properties.route_id
-      const dynamicOffset = dynamicOffsets[routeId]
-      const originalOffset = f.properties.offset_meters
+      if (!selectedRoutes.has(routeId)) return
       
-      // If offset changed, recalculate geometry
-      if (dynamicOffset !== undefined && dynamicOffset !== originalOffset) {
-        const newCoords = applyDynamicOffset(
-          f.geometry.coordinates,
-          dynamicOffset,
-          originalOffset
-        )
-        
-        features.push({
-          ...f,
-          geometry: {
-            ...f.geometry,
-            coordinates: newCoords
-          },
-          properties: {
-            ...f.properties,
-            dynamic_offset: dynamicOffset
-          }
-        })
-      } else {
+      const isDebug = f.properties.debug
+      const mode = routeDisplayMode[routeId]
+      
+      // Include if:
+      // - it's an offset line (debug=false) and we want offset
+      // - it's a center line (debug=true) and we want center
+      if ((mode === 'offset' && !isDebug) || (mode === 'center' && isDebug)) {
         features.push(f)
       }
     })
     
     return { type: 'FeatureCollection', features }
-  }, [routesGeoJSON, selectedRoutes, dynamicOffsets])
+  }, [routesGeoJSON, selectedRoutes, routeDisplayMode])
 
-  // Debug routes (original unmodified lines)
+  // Debug routes (original unmodified lines) - only when explicitly enabled
   const debugRoutes = useMemo(() => {
     if (!routesGeoJSON || !showDebug) return { type: 'FeatureCollection', features: [] }
     return {

@@ -8,8 +8,7 @@ function RouteSidebar({
   onToggleStops,
   onShowTimetable,
   showDebug,
-  onToggleDebug,
-  useCenterline
+  onToggleDebug
 }) {
   const selectedCount = selectedRoutes.size
   const totalCount = routes.length
@@ -19,9 +18,6 @@ function RouteSidebar({
       <header className="sidebar-header">
         <h1>Tirana Transit</h1>
         <p>{selectedCount} of {totalCount} lines selected</p>
-        {useCenterline && (
-          <p className="centerline-hint">Showing road centerline</p>
-        )}
       </header>
 
       <div className="sidebar-controls">

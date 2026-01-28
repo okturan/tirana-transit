@@ -21,16 +21,24 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     return info
   }, [routes])
 
-  // Filter routes based on selection (exclude debug features)
+  // Dynamic offset: Show original centerline when only 1 route is selected
+  // Show offset lines when multiple routes are selected (for visual separation)
+  const useOriginalLines = selectedRoutes.size === 1
+  
   const filteredRoutes = useMemo(() => {
     if (!routesGeoJSON) return { type: 'FeatureCollection', features: [] }
+    
+    // When only 1 route is selected, use the original (debug) centerline
+    // This prevents the "going through buildings" effect
+    const useDebug = useOriginalLines
+    
     return {
       type: 'FeatureCollection',
       features: routesGeoJSON.features.filter(f =>
-        selectedRoutes.has(f.properties.route_id) && !f.properties.debug
+        selectedRoutes.has(f.properties.route_id) && f.properties.debug === useDebug
       )
     }
-  }, [routesGeoJSON, selectedRoutes])
+  }, [routesGeoJSON, selectedRoutes, useOriginalLines])
 
   // Debug routes (original unmodified lines)
   const debugRoutes = useMemo(() => {

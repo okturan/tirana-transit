@@ -45,6 +45,10 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       }
     })
     
+    console.log('corridor_1 routes:', corridorGroups['corridor_1']?.map(r => r.routeId))
+    console.log('routeCorridor[4] (3B):', routeCorridor['4'])
+    console.log('routeCorridor[47] (3C):', routeCorridor['47'])
+    
     return { corridorGroups, routeCorridor }
   }, [routesGeoJSON])
 
@@ -55,9 +59,14 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     const mode = {}
     const { corridorGroups, routeCorridor } = corridorInfo
     
+    console.log('corridor_1 group:', corridorGroups['corridor_1'])
+    
     // For each selected route, check if it's alone in its corridor
     selectedRoutes.forEach(routeId => {
       const info = routeCorridor[routeId]
+      
+      console.log(`Route ${routeId}: info=`, info)
+      
       if (!info || !info.group) {
         // Route not in a corridor, always show its offset
         mode[routeId] = 'offset'
@@ -73,6 +82,8 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
       // Count how many routes from this corridor are visible
       const visibleInCorridor = group.filter(r => selectedRoutes.has(r.routeId)).length
       
+      console.log(`Route ${routeId} in ${info.group}: visible=${visibleInCorridor}, total=${group.length}`)
+      
       // If alone in corridor, use centerline
       // If multiple visible, use offset
       mode[routeId] = visibleInCorridor === 1 ? 'center' : 'offset'
@@ -87,17 +98,27 @@ function TransitMap({ routesGeoJSON, stopsGeoJSON, selectedRoutes, showStops, ro
     
     const features = []
     
+    console.log('Building filtered routes, selected:', Array.from(selectedRoutes).slice(0,5))
+    console.log('routeDisplayMode:', routeDisplayMode)
+    
     routesGeoJSON.features.forEach(f => {
       const routeId = f.properties.route_id
+      const shortName = f.properties.route_short_name
       if (!selectedRoutes.has(routeId)) return
       
       const isDebug = f.properties.debug
       const mode = routeDisplayMode[routeId]
       
+      const shouldInclude = (mode === 'offset' && !isDebug) || (mode === 'center' && isDebug)
+      
+      if (shortName === '3B' || shortName === '3C') {
+        console.log(`${shortName} (id=${routeId}): debug=${isDebug}, mode=${mode}, include=${shouldInclude}, points=${f.geometry.coordinates.length}`)
+      }
+      
       // Include if:
       // - it's an offset line (debug=false) and we want offset
       // - it's a center line (debug=true) and we want center
-      if ((mode === 'offset' && !isDebug) || (mode === 'center' && isDebug)) {
+      if (shouldInclude) {
         features.push(f)
       }
     })

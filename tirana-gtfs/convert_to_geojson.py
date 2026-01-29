@@ -579,6 +579,12 @@ for route in routes:
             routes_features.append(feature)
 
             # Debug feature (original coordinates, no offset)
+            # For ring routes, remove duplicate end point to make it a proper line
+            start = original_coords[0]
+            end = original_coords[-1]
+            is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001
+            debug_coords = original_coords[:-1] if is_ring else original_coords
+            
             debug_feature = {
                 "type": "Feature",
                 "properties": {
@@ -595,7 +601,7 @@ for route in routes:
                 },
                 "geometry": {
                     "type": "LineString",
-                    "coordinates": original_coords
+                    "coordinates": debug_coords
                 }
             }
             routes_features.append(debug_feature)

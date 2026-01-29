@@ -541,20 +541,28 @@ for route in routes:
             original_coords = shape_geometries[shape_id]
             direction = shape_id.split('_')[-1] if '_' in shape_id else '0'
 
+            # Check if this is a ring route (start == end)
+            start = original_coords[0]
+            end = original_coords[-1]
+            is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001
+
             # Calculate offset (negative = right side of road)
             total_offset = get_offset_for_shape(short_name, direction, corridor_assignments)
             
-            # For ring routes (circular routes like 13A/13B, 16A/16B):
-            # If route name ends with 'B' or contains 'Antiorar', it's the reverse direction
-            # Flip the offset so A and B appear on opposite sides of the road
-            long_name = route.get('route_long_name', '').lower()
-            if short_name.endswith('B') or 'antiorar' in long_name:
+            # For ring routes (circular routes like 3A, 3B, 13A, 13B, 16A, 16B):
+            # Don't apply offset - it breaks the ring geometry and causes stops
+            # to be far from the route. Use centerline instead.
+            if is_ring:
+                total_offset = 0
+            elif short_name.endswith('B') or 'antiorar' in route['route_long_name'].lower():
+                # For non-ring B routes, flip the offset
                 total_offset = -total_offset
 
             if total_offset != 0:
                 coords = offset_line_geographic(original_coords, total_offset)
             else:
-                coords = original_coords
+                # For rings, remove duplicate end point for cleaner rendering
+                coords = original_coords[:-1] if is_ring else original_coords
 
             # Main feature (with offset applied)
             feature = {

@@ -1,6 +1,6 @@
 # 🚌 Tirana Transportation
 
-A transit visualization project for Tirana, Albania. This repository contains both the GTFS data processing pipeline and the interactive web map application.
+Transit visualization for Tirana, Albania. Contains the GTFS data processing pipeline and the interactive web map app.
 
 ## Project Structure
 
@@ -28,7 +28,7 @@ npm run dev
 
 ### 2. (Optional) Regenerate Data
 
-If you have updated GTFS files:
+If the GTFS files have been updated:
 
 ```bash
 cd gtfs-data
@@ -40,11 +40,11 @@ python3 convert_to_geojson.py
 
 ## Data Overview
 
-- **27 bus routes** covering the Tirana metropolitan area
-- **491 bus stops** with precise GPS coordinates
-- **16,642 trips** with full schedule information
-- **Service period**: January 2026 – December 2026
-- **Source**: [pt.tirana.al/gtfs/gtfs.zip](https://pt.tirana.al/gtfs/gtfs.zip) (feed v0.2.0)
+- 27 bus routes covering Tirana
+- 491 bus stops with GPS coordinates
+- 16,642 trips with full schedule information
+- Service period: January 2026 to December 2026
+- Source: [pt.tirana.al/gtfs/gtfs.zip](https://pt.tirana.al/gtfs/gtfs.zip) (feed v0.2.0)
 
 ## Technology Stack
 
@@ -62,13 +62,5 @@ python3 convert_to_geojson.py
 
 ## License
 
-- **Transit Data**: © Municipality of Tirana, CC-BY-SA-4.0
-- **Code**: MIT License
-
-## Contributing
-
-Contributions welcome! Please ensure:
-1. Code follows existing style patterns
-2. Components are memoized for performance
-3. Error boundaries are used for error handling
-4. Changes are tested on both desktop and mobile
+- Transit data: © Municipality of Tirana, CC-BY-SA-4.0
+- Code: MIT License

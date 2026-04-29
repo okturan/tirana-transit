@@ -2,6 +2,8 @@
 
 Interactive map of public bus routes in Tirana, Albania. Built with React, MapLibre GL, and GTFS data from the Municipality of Tirana.
 
+![Tirana Transit Map screenshot](./public/screenshot.png)
+
 ![Tirana Transit](https://img.shields.io/badge/Tirana-Transit-blue)
 ![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react)
 ![MapLibre](https://img.shields.io/badge/MapLibre-GL-396)
@@ -106,12 +108,12 @@ The script:
 The app uses URL hash parameters for sharing views:
 
 ```
-#routes=1A,2,3A    # Comma-separated route names
+#routes=1,3,6      # Comma-separated GTFS route IDs
 #stops=1           # Show bus stops
 #debug=1           # Show debug lines
 ```
 
-Example: `http://localhost:5173/#routes=1A,3A,5A&stops=1`
+Example: `http://localhost:5173/#routes=1,3,6,10,15,46&stops=1` (the route IDs in this example map to short names 1A, 3A, 5A, 8A, 10A, 13A)
 
 ## Troubleshooting
 

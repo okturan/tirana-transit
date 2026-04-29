@@ -1,27 +1,27 @@
 # 🚌 Tirana Transportation
 
-A comprehensive transit visualization project for Tirana, Albania. This repository contains both the GTFS data processing pipeline and the interactive web map application.
+A transit visualization project for Tirana, Albania. This repository contains both the GTFS data processing pipeline and the interactive web map application.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-tirana-transportation/
-├── tirana-gtfs/          # GTFS data processing (Python)
+tirana-transit/
+├── gtfs-data/          # GTFS data processing (Python)
 │   ├── convert_to_geojson.py
-│   ├── *.txt             # GTFS source files
-│   └── venv/             # Python virtual environment
-└── tirana-transit/       # Web application (React + Vite)
-    ├── src/              # React components
-    ├── public/data/      # Generated GeoJSON files
+│   ├── *.txt           # GTFS source files
+│   └── venv/           # Python virtual environment
+└── map-app/            # Web application (React + Vite)
+    ├── src/            # React components
+    ├── public/data/    # Generated GeoJSON files
     └── package.json
 ```
 
-## 🏃 Quick Start
+## Quick Start
 
 ### 1. Start the Web App
 
 ```bash
-cd tirana-transit
+cd map-app
 npm install
 npm run dev
 ```
@@ -31,21 +31,22 @@ npm run dev
 If you have updated GTFS files:
 
 ```bash
-cd tirana-gtfs
+cd gtfs-data
 python3 -m venv venv
 source venv/bin/activate
 pip install shapely pyproj
 python3 convert_to_geojson.py
 ```
 
-## 📊 Data Overview
+## Data Overview
 
-- **26 bus routes** covering Tirana metropolitan area
-- **467 bus stops** with precise GPS coordinates
-- **16,777 trips** with full schedule information
-- **Service period**: January 2026 - December 2026
+- **27 bus routes** covering the Tirana metropolitan area
+- **491 bus stops** with precise GPS coordinates
+- **16,642 trips** with full schedule information
+- **Service period**: January 2026 – December 2026
+- **Source**: [pt.tirana.al/gtfs/gtfs.zip](https://pt.tirana.al/gtfs/gtfs.zip) (feed v0.2.0)
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Component | Technology |
 |-----------|------------|
@@ -54,17 +55,17 @@ python3 convert_to_geojson.py
 | Mapping | MapLibre GL |
 | Styling | CSS3 |
 
-## 📚 Documentation
+## Documentation
 
-- [Web App README](./tirana-transit/README.md)
-- [Data Pipeline](./tirana-gtfs/convert_to_geojson.py) (inline documentation)
+- [Web App README](./map-app/README.md)
+- [Data Pipeline](./gtfs-data/convert_to_geojson.py) (inline documentation)
 
-## 📄 License
+## License
 
 - **Transit Data**: © Municipality of Tirana, CC-BY-SA-4.0
 - **Code**: MIT License
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please ensure:
 1. Code follows existing style patterns

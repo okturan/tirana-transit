@@ -2,6 +2,8 @@
 
 Transit visualization for Tirana, Albania. Contains the GTFS data processing pipeline and the interactive web map app.
 
+![Tirana Transit Map screenshot](./map-app/public/screenshot.png)
+
 ## Project Structure
 
 ```

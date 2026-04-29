@@ -10,9 +10,9 @@ from shapely.geometry import LineString, Point
 from shapely.ops import transform
 import pyproj
 
-# Output directory - by default writes to ../tirana-transit/public/data/
+# Output directory - by default writes to ../map-app/public/data/
 # Can be overridden with OUTPUT_DIR environment variable
-DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tirana-transit', 'public', 'data')
+DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'map-app', 'public', 'data')
 OUTPUT_DIR = os.environ.get('OUTPUT_DIR', DEFAULT_OUTPUT_DIR)
 
 # Ensure output directory exists

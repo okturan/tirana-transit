@@ -183,7 +183,7 @@ def offset_vertices(line, offset_meters):
                 normal = (combined_x / combined_length, combined_y / combined_length)
                 projection = normal[0] * after[0] + normal[1] * after[1]
                 scale = offset_meters / projection if abs(projection) > 0.25 else offset_meters
-                maximum_scale = abs(offset_meters) * 3
+                maximum_scale = abs(offset_meters) * 2
                 scale = max(-maximum_scale, min(maximum_scale, scale))
 
         offset_coordinates.append((x + normal[0] * scale, y + normal[1] * scale))
@@ -409,8 +409,7 @@ def offset_line_geographic(coords, offset_meters):
     end = coords[-1]
     is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001  # ~10m threshold
 
-    # For rings, remove the duplicate end point to make it a line
-    # parallel_offset works better on open lines
+    # For rings, remove the duplicate end point to make it a line.
     # IMPORTANT: Make a copy to avoid modifying the original list
     working_coords = coords[:-1] if is_ring else list(coords)
 
@@ -420,29 +419,7 @@ def offset_line_geographic(coords, offset_meters):
     try:
         line = LineString(working_coords)
         line_utm = transform(to_utm, line)
-
-        distance = abs(offset_meters)
-        side = 'left' if offset_meters > 0 else 'right'
-
-        offset_line_utm = line_utm.parallel_offset(
-            distance,
-            side=side,
-            resolution=16,
-            join_style=2,
-            mitre_limit=2.0
-        )
-
-        if offset_line_utm.is_empty:
-            offset_line_utm = LineString()
-
-        if offset_line_utm.geom_type == 'MultiLineString':
-            # A fragmented parallel offset can silently discard most of a route.
-            # The vertex fallback below preserves every source segment instead.
-            offset_line_utm = LineString()
-
-        if not offset_preserves_route(line_utm, offset_line_utm, offset_meters):
-            print("  Warning: fragmented offset detected; using vertex-preserving fallback")
-            offset_line_utm = offset_vertices(line_utm, offset_meters)
+        offset_line_utm = offset_vertices(line_utm, offset_meters)
 
         if not offset_preserves_route(line_utm, offset_line_utm, offset_meters):
             print("  Warning: offset validation failed; using original geometry")

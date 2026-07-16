@@ -48,7 +48,7 @@ python -m pip install --requirement requirements.txt
 python convert_to_geojson.py
 ```
 
-The converter uses Python 3.13 and a pinned geometry stack, reads the bundled GTFS tables, and writes generated files to `map-app/public/data/`. It rejects fragmented offsets that would discard route segments and normalizes output for stable snapshots. Set `OUTPUT_DIR` to validate a conversion without replacing the tracked snapshot.
+The converter uses Python 3.13 and a pinned geometry stack, reads the bundled GTFS tables, and writes generated files to `map-app/public/data/`. Its vertex-preserving offset algorithm retains every route segment and normalizes output for stable cross-platform snapshots. Set `OUTPUT_DIR` to validate a conversion without replacing the tracked snapshot.
 
 ## Architecture
 

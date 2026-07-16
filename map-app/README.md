@@ -38,9 +38,12 @@ Open `http://localhost:5173`.
 ## Production build
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```
+
+The tests protect shareable URL state and validate the checked-in GTFS-derived route, stop, geometry, timetable, and trip-count contracts.
 
 Vite writes the production bundle to `dist/`.
 

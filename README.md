@@ -1,5 +1,8 @@
 # Tirana Transit
 
+[![CI](https://github.com/okturan/tirana-transit/actions/workflows/ci.yml/badge.svg)](https://github.com/okturan/tirana-transit/actions/workflows/ci.yml)
+[![Deploy Pages](https://github.com/okturan/tirana-transit/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/okturan/tirana-transit/actions/workflows/deploy-pages.yml)
+
 An interactive map of Tirana's public bus network backed by a reproducible GTFS-to-GeoJSON pipeline. The project converts a municipality feed into browser-ready routes, stops, and timetables, then renders route selection, corridor offsets, stop service, and schedules with React and MapLibre.
 
 ![Tirana Transit map showing color-coded bus routes](./map-app/public/screenshot.png)
@@ -63,6 +66,7 @@ See the [web app documentation](./map-app/README.md) for feature and URL-state d
 ```bash
 cd map-app
 npm ci
+npm test
 npm run lint
 npm run build
 

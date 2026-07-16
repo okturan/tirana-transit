@@ -72,6 +72,7 @@ test('every rendered shape preserves its complete debug centerline', () => {
 
     const mainCoordinates = pair.main[0].geometry.coordinates
     const debugCoordinates = pair.debug[0].geometry.coordinates
+    assert.equal(mainCoordinates.length, debugCoordinates.length, `${key} changed vertex count`)
     const lengthRatio = lineLengthMeters(mainCoordinates) / lineLengthMeters(debugCoordinates)
     assert.ok(lengthRatio >= 0.90 && lengthRatio <= 1.10, `${key} lost route geometry (${lengthRatio})`)
 

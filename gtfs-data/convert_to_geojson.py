@@ -94,6 +94,8 @@ MAX_TOTAL_OFFSET = 20  # meters - cap total offset (was 30m)
 PROXIMITY_THRESHOLD = 35  # meters - detection threshold for shared corridors
 CROSS_FAMILY_THRESHOLD = 0.40  # 40% - high threshold for cross-family corridor detection
 MIN_OFFSET_SEGMENT_LENGTH = 0.5  # meters - ignore near-duplicate GTFS vertices
+OFFSET_RETRY_STEP = 0.25  # meters - deterministic search for the largest safe offset
+MIN_USEFUL_OFFSET = 0.25  # meters - smaller offsets are visually indistinguishable
 
 def sample_line_points(coords, interval_meters=50):
     """Sample points along a line at regular intervals."""
@@ -197,6 +199,40 @@ def offset_preserves_route(original, candidate, offset_meters):
     if candidate.is_empty or candidate.geom_type != 'LineString':
         return False
 
+    original_coordinates = list(original.coords)
+    candidate_coordinates = list(candidate.coords)
+    if len(original_coordinates) != len(candidate_coordinates):
+        return False
+
+    # An offset of a simple centerline must not introduce a loop or crossing.
+    if original.is_simple and not candidate.is_simple:
+        return False
+
+    # A global length check can hide short local reversals at sharp corners.
+    # Since offset_vertices preserves vertex correspondence, validate every
+    # meaningful source segment against its candidate segment directly.
+    for source_start, source_end, candidate_start, candidate_end in zip(
+        original_coordinates,
+        original_coordinates[1:],
+        candidate_coordinates,
+        candidate_coordinates[1:],
+    ):
+        source_dx = source_end[0] - source_start[0]
+        source_dy = source_end[1] - source_start[1]
+        source_length = (source_dx * source_dx + source_dy * source_dy) ** 0.5
+        if source_length < MIN_OFFSET_SEGMENT_LENGTH:
+            continue
+
+        candidate_dx = candidate_end[0] - candidate_start[0]
+        candidate_dy = candidate_end[1] - candidate_start[1]
+        candidate_length = (candidate_dx * candidate_dx + candidate_dy * candidate_dy) ** 0.5
+        if candidate_length < MIN_OFFSET_SEGMENT_LENGTH:
+            return False
+
+        direction_dot_product = source_dx * candidate_dx + source_dy * candidate_dy
+        if direction_dot_product <= 0:
+            return False
+
     original_length = original.length
     if original_length == 0:
         return False
@@ -212,7 +248,19 @@ def offset_preserves_route(original, candidate, offset_meters):
     forward_distance = source_start.distance(candidate_start) + source_end.distance(candidate_end)
     reverse_distance = source_start.distance(candidate_end) + source_end.distance(candidate_start)
     endpoint_tolerance = max(100, abs(offset_meters) * 5)
-    return min(forward_distance, reverse_distance) <= endpoint_tolerance
+    return forward_distance <= endpoint_tolerance and forward_distance <= reverse_distance
+
+
+def decreasing_offset_candidates(requested_offset):
+    """Yield deterministic offset candidates from largest to smallest."""
+    sign = -1 if requested_offset < 0 else 1
+    requested_magnitude = abs(requested_offset)
+    yield requested_offset
+
+    candidate_magnitude = requested_magnitude - OFFSET_RETRY_STEP
+    while candidate_magnitude >= MIN_USEFUL_OFFSET - 1e-9:
+        yield sign * round(candidate_magnitude, 9)
+        candidate_magnitude -= OFFSET_RETRY_STEP
 
 
 def rounded_coordinates(coordinates, precision=8):
@@ -401,9 +449,9 @@ def get_offset_for_shape(short_name, direction, corridor_assignments):
     return total
 
 def offset_line_geographic(coords, offset_meters):
-    """Offset a line by a given number of meters using geographic projection."""
+    """Return coordinates and the largest safe applied offset in meters."""
     if offset_meters == 0 or len(coords) < 2:
-        return coords
+        return rounded_coordinates(coords), 0
 
     # Check if this is a ring (closed loop) - start and end points are very close
     start = coords[0]
@@ -415,36 +463,34 @@ def offset_line_geographic(coords, offset_meters):
     working_coords = coords[:-1] if is_ring else list(coords)
 
     if len(working_coords) < 2:
-        return coords
+        return rounded_coordinates(coords), 0
 
     try:
         line = LineString(working_coords)
         line_utm = transform(to_utm, line)
-        offset_line_utm = offset_vertices(line_utm, offset_meters)
 
-        if not offset_preserves_route(line_utm, offset_line_utm, offset_meters):
-            print("  Warning: offset validation failed; using original geometry")
-            offset_line_utm = line_utm
+        for candidate_offset in decreasing_offset_candidates(offset_meters):
+            offset_line_utm = offset_vertices(line_utm, candidate_offset)
+            if not offset_preserves_route(line_utm, offset_line_utm, candidate_offset):
+                continue
 
-        offset_line = transform(to_wgs84, offset_line_utm)
-        result_coords = list(offset_line.coords)
+            if candidate_offset != offset_meters:
+                print(
+                    f"  Warning: reduced offset from {offset_meters:.3f}m "
+                    f"to {candidate_offset:.3f}m to preserve route geometry"
+                )
+            offset_line = transform(to_wgs84, offset_line_utm)
+            return rounded_coordinates(offset_line.coords), candidate_offset
 
-        # Check if reversal needed (parallel_offset can reverse direction)
-        original_start = working_coords[0]
-        result_start = result_coords[0]
-        result_end = result_coords[-1]
-
-        dist_to_start = ((original_start[0] - result_start[0])**2 + (original_start[1] - result_start[1])**2)**0.5
-        dist_to_end = ((original_start[0] - result_end[0])**2 + (original_start[1] - result_end[1])**2)**0.5
-
-        if dist_to_end < dist_to_start:
-            result_coords = result_coords[::-1]
-
-        return rounded_coordinates(result_coords)
+        print(
+            f"  Warning: no safe offset up to {offset_meters:.3f}m; "
+            "using original geometry"
+        )
+        return rounded_coordinates(working_coords), 0
 
     except Exception as e:
         print(f"  Warning: offset failed ({e}), using original geometry")
-        return rounded_coordinates(coords)
+        return rounded_coordinates(working_coords), 0
 
 # Load data
 print("Loading GTFS data...")
@@ -629,11 +675,13 @@ for route in routes:
                 # For non-ring B routes, flip the offset
                 total_offset = -total_offset
 
-            if total_offset != 0:
-                coords = offset_line_geographic(original_coords, total_offset)
+            requested_offset = total_offset
+            if requested_offset != 0:
+                coords, applied_offset = offset_line_geographic(original_coords, requested_offset)
             else:
                 # For rings, remove duplicate end point for cleaner rendering
                 coords = rounded_coordinates(original_coords[:-1] if is_ring else original_coords)
+                applied_offset = 0
 
             # Main feature (with offset applied)
             feature = {
@@ -647,7 +695,8 @@ for route in routes:
                     "shape_id": shape_id,
                     "direction": direction,
                     "corridor_group": corridor_info[0],
-                    "offset_meters": total_offset,
+                    "requested_offset_meters": requested_offset,
+                    "offset_meters": applied_offset,
                     "debug": False
                 },
                 "geometry": {

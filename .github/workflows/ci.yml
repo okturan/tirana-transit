@@ -61,7 +61,15 @@ jobs:
           cache-dependency-path: gtfs-data/requirements.txt
       - run: python -m pip install --requirement requirements.txt
       - name: Regenerate tracked map data
-        run: python convert_to_geojson.py
+        run: PYTHONHASHSEED=1 python convert_to_geojson.py
+      - name: Validate generated route geometry
+        run: python validate_generated_geometry.py
+      - name: Verify first regeneration is byte-exact
+        run: git diff --exit-code -- ../map-app/public/data
+      - name: Regenerate with a second hash seed
+        run: PYTHONHASHSEED=8675309 python convert_to_geojson.py
+      - name: Revalidate generated route geometry
+        run: python validate_generated_geometry.py
       - name: Preserve generated map data
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

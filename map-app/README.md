@@ -1,133 +1,84 @@
-# 🚌 Tirana Transit Map
+# Tirana Transit Map
 
-Interactive map of public bus routes in Tirana, Albania. Built with React, MapLibre GL, and GTFS data from the Municipality of Tirana.
+Interactive map of public bus routes in Tirana, Albania. It turns the repository's municipality GTFS snapshot into a route explorer with readable corridor offsets, stop service, timetables, and shareable URL state.
 
-![Tirana Transit Map screenshot](./public/screenshot.png)
-
-![Tirana Transit](https://img.shields.io/badge/Tirana-Transit-blue)
-![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react)
-![MapLibre](https://img.shields.io/badge/MapLibre-GL-396)
+![Tirana Transit map showing color-coded bus routes](./public/screenshot.png)
 
 ## Features
 
-- Pan and zoom over Tirana with MapLibre GL
-- All 27 bus routes, with offsetting so overlapping corridors stay readable
-- Bus stop markers showing which routes serve each stop
-- Per-route timetables by direction and day type
-- URL hash for shareable views (selected routes, display settings)
-- Mobile-responsive layout
-- Debug mode comparing original GTFS paths to offset routes
+- Pan and zoom over Tirana with MapLibre GL.
+- Explore 27 bus routes with offsets that keep shared corridors readable.
+- Inspect which routes serve a stop and open per-route timetables.
+- Share selected routes and display settings through the URL hash.
+- Use a responsive interface plus an optional geometry-debug view.
 
-## Data Coverage
+## Data coverage
 
 | Metric | Value |
-|--------|-------|
+|---|---|
 | Routes | 27 (1A-B, 2, 3A-C, 4, 5A-B, 6, 8A-C, 9A-B, 10A-C, 11, 12A-B, 13A-B, 15A-B, 16A-B) |
 | Stops | 491 |
 | Trips | 16,642 |
-| Service Period | January 2026 to December 2026 |
-| Data Source | [pt.tirana.al/gtfs/gtfs.zip](https://pt.tirana.al/gtfs/gtfs.zip) (Bashkia Tiranë, feed v0.2.0) |
+| Service period | January 2026 to December 2026 |
+| Data source | [Municipality of Tirana GTFS](https://pt.tirana.al/gtfs/gtfs.zip), feed `0.2.0` |
 
-## Getting Started
+These figures describe the checked-in snapshot, not necessarily the current live network. This is a static schedule map, not live vehicle tracking or a journey planner.
 
-### Prerequisites
+## Run locally
 
-- Node.js 18+
-- npm or yarn
-
-### Run
+Vite 7 requires Node.js 20.19+ or 22.12+.
 
 ```bash
-cd map-app
-npm install
+npm ci
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+Open `http://localhost:5173`.
 
-### Build for Production
+## Production build
 
 ```bash
+npm run lint
 npm run build
 ```
 
-Output goes to `dist/`.
+Vite writes the production bundle to `dist/`.
 
 ## Architecture
 
-```
+```text
 map-app/
 ├── src/
 │   ├── components/
 │   │   ├── TransitMap.jsx      # MapLibre map
 │   │   ├── RouteSidebar.jsx    # Route selection
-│   │   ├── TimetableModal.jsx  # Schedule modal
-│   │   └── ErrorBoundary.jsx   # Error handling
-│   ├── App.jsx                 # State management
-│   ├── App.css                 # Styles
+│   │   ├── TimetableModal.jsx  # Schedule view
+│   │   └── ErrorBoundary.jsx   # Render failure boundary
+│   ├── App.jsx                 # Application state
+│   ├── App.css                 # Component styles
 │   └── main.jsx                # Entry point
-├── public/
-│   └── data/                   # Generated GeoJSON
-│       ├── routes.geojson
-│       ├── stops.geojson
-│       └── route_metadata.json
+├── public/data/                # Generated transit data
 └── package.json
 ```
 
-## Data Pipeline
+The pipeline in `../gtfs-data/convert_to_geojson.py` parses GTFS, detects shared corridors, offsets overlapping geometry, and regenerates `public/data/`.
 
-GTFS processing happens in `gtfs-data/`:
+## Shareable URL state
 
-```bash
-cd ../gtfs-data
-source venv/bin/activate
-python3 convert_to_geojson.py
+```text
+#routes=1,3,6      # comma-separated GTFS route IDs
+#stops=1           # show bus stops
+#debug=1           # compare original and offset geometry
 ```
 
-The script:
-1. Parses GTFS files (routes, stops, trips, shapes, schedules)
-2. Detects corridor groups for routes that share roads
-3. Calculates geographic offsets to prevent overlapping lines
-4. Generates GeoJSON files for the web app
-
-## Route Colors
-
-| Route | Color | Route | Color |
-|-------|-------|-------|-------|
-| 1A    | 🔴 Red          | 8A-C  | 🟣 Purple |
-| 1B    | 🔴 Coral        | 9A-B  | 🫒 Lime |
-| 2     | 🩷 Pink         | 10A-C | 🟠 Orange |
-| 3A-C  | 🔵 Cyan         | 11    | 🔵 Blue |
-| 4     | 🟣 Maroon       | 12A-B | 🩵 Teal |
-| 5A-B  | 🟢 Green        | 13A-B | 🟣 Magenta |
-| 6     | 🩷 Rose         | 15A-B | 🟠 Deep Orange |
-|       |                 | 16A-B | 🟢 Light Green |
-
-## URL Parameters
-
-The app uses URL hash parameters for sharing views:
-
-```
-#routes=1,3,6      # Comma-separated GTFS route IDs
-#stops=1           # Show bus stops
-#debug=1           # Show debug lines
-```
-
-Example: `http://localhost:5173/#routes=1,3,6,10,15,46&stops=1` (the route IDs in this example map to short names 1A, 3A, 5A, 8A, 10A, 13A)
+For example, `http://localhost:5173/#routes=1,3,6,10,15,46&stops=1` selects the short-name routes 1A, 3A, 5A, 8A, 10A, and 13A.
 
 ## Troubleshooting
 
-Map doesn't load:
-- Check browser console for CORS errors
-- Verify `public/data/` contains the GeoJSON files
-- Make sure you're running via the dev server (`npm run dev`)
+- If the map is empty, confirm `public/data/` contains the generated GeoJSON and metadata files.
+- Run the application through Vite rather than opening `index.html` directly.
+- To refresh the data, run the root README's pipeline instructions against an updated feed.
 
-Data is outdated:
-- Run the data pipeline: `cd ../gtfs-data && python3 convert_to_geojson.py`
-- Refresh the browser
+## Licensing and provenance
 
-## License
-
-Transit data: © Municipality of Tirana, CC-BY-SA-4.0
-
-Code: MIT License
+Original application code is covered by the repository's [MIT License](../LICENSE). The bundled GTFS snapshot and generated transit data are separate: `../gtfs-data/feed_info.txt` declares `CC-BY-SA-4.0` and the municipality attribution that must accompany reuse. Third-party libraries and assets retain their own licenses.

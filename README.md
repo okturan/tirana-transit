@@ -1,68 +1,81 @@
-# 🚌 Tirana Transportation
+# Tirana Transit
 
-Transit visualization for Tirana, Albania. Contains the GTFS data processing pipeline and the interactive web map app.
+An interactive map of Tirana's public bus network backed by a reproducible GTFS-to-GeoJSON pipeline. The project converts a municipality feed into browser-ready routes, stops, and timetables, then renders route selection, corridor offsets, stop service, and schedules with React and MapLibre.
 
-![Tirana Transit Map screenshot](./map-app/public/screenshot.png)
+![Tirana Transit map showing color-coded bus routes](./map-app/public/screenshot.png)
 
-## Project Structure
+## What it demonstrates
 
-```
-tirana-transit/
-├── gtfs-data/          # GTFS data processing (Python)
-│   ├── convert_to_geojson.py
-│   ├── *.txt           # GTFS source files
-│   └── venv/           # Python virtual environment
-└── map-app/            # Web application (React + Vite)
-    ├── src/            # React components
-    ├── public/data/    # Generated GeoJSON files
-    └── package.json
-```
+- Converts static GTFS tables into GeoJSON and compact route metadata with Python.
+- Detects shared corridors and offsets overlapping route geometry for a readable network map.
+- Shows the routes serving each stop and timetables by direction and day type.
+- Persists selected routes and display settings in the URL hash for shareable views.
+- Keeps the data pipeline and the React map independently runnable.
 
-## Quick Start
+## Project status
 
-### 1. Start the Web App
+| | Current state |
+|---|---|
+| Application | Working local showcase; no public deployment is currently configured or verified |
+| Data snapshot | Municipality of Tirana feed `0.2.0`, covering 2026-01-01 through 2026-12-31 |
+| Bundled coverage | 27 routes, 491 stops, and 16,642 scheduled trips |
+| Scope | Static schedule visualization; not live vehicle tracking or a journey planner |
+
+The counts above describe the bundled snapshot, not necessarily the municipality's current live network. The source snapshot is available from [pt.tirana.al](https://pt.tirana.al/gtfs/gtfs.zip).
+
+## Quick start
+
+Vite 7 requires Node.js 20.19+ or 22.12+.
 
 ```bash
 cd map-app
-npm install
+npm ci
 npm run dev
 ```
 
-### 2. (Optional) Regenerate Data
+Open `http://localhost:5173`.
 
-If the GTFS files have been updated:
+## Regenerate the map data
 
 ```bash
 cd gtfs-data
-python3 -m venv venv
-source venv/bin/activate
-pip install shapely pyproj
-python3 convert_to_geojson.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install shapely pyproj
+python convert_to_geojson.py
 ```
 
-## Data Overview
+The converter reads the bundled GTFS tables and writes generated files to `map-app/public/data/`. Set `OUTPUT_DIR` to validate a conversion without replacing the tracked snapshot.
 
-- 27 bus routes covering Tirana
-- 491 bus stops with GPS coordinates
-- 16,642 trips with full schedule information
-- Service period: January 2026 to December 2026
-- Source: [pt.tirana.al/gtfs/gtfs.zip](https://pt.tirana.al/gtfs/gtfs.zip) (feed v0.2.0)
+## Architecture
 
-## Technology Stack
+| Path | Responsibility |
+|---|---|
+| `gtfs-data/convert_to_geojson.py` | GTFS parsing, corridor detection, geometry offsets, and output generation |
+| `gtfs-data/*.txt` | Municipality GTFS snapshot and its embedded feed metadata |
+| `map-app/public/data/` | Generated GeoJSON and route/timetable metadata |
+| `map-app/src/` | React UI, MapLibre map, route controls, and timetable views |
 
-| Component | Technology |
-|-----------|------------|
-| Data Processing | Python, Shapely, PyProj |
-| Frontend | React 19, Vite 7 |
-| Mapping | MapLibre GL |
-| Styling | CSS3 |
+See the [web app documentation](./map-app/README.md) for feature and URL-state details.
 
-## Documentation
+## Verification
 
-- [Web App README](./map-app/README.md)
-- [Data Pipeline](./gtfs-data/convert_to_geojson.py) (inline documentation)
+```bash
+cd map-app
+npm ci
+npm run lint
+npm run build
 
-## License
+cd ../gtfs-data
+OUTPUT_DIR=/tmp/tirana-transit-output python3 convert_to_geojson.py
+```
 
-- Transit data: © Municipality of Tirana, CC-BY-SA-4.0
-- Code: MIT License
+## Licensing and provenance
+
+Repository history identifies the application and conversion pipeline as owner-authored. The original software and documentation are licensed under the [MIT License](./LICENSE).
+
+That software license does **not** relicense the transit feed or its derivatives. The bundled `gtfs-data/feed_info.txt` declares the municipality feed as `CC-BY-SA-4.0` and requires this attribution:
+
+> Schedule data created and provided by Municipality of Tirana, Directorate of Transportation and Road Traffic
+
+The GTFS files under `gtfs-data/` and generated transit data under `map-app/public/data/` remain subject to those data terms. Third-party libraries and assets remain under their respective licenses.

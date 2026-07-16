@@ -230,7 +230,7 @@ def offset_preserves_route(original, candidate, offset_meters):
         candidate_dx = candidate_end[0] - candidate_start[0]
         candidate_dy = candidate_end[1] - candidate_start[1]
         candidate_length = math.hypot(candidate_dx, candidate_dy)
-        if candidate_length == 0:
+        if candidate_length < MIN_OFFSET_SEGMENT_LENGTH - 0.01:
             return False
 
         length_ratio = candidate_length / source_length

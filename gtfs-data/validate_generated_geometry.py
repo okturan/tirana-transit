@@ -61,6 +61,7 @@ def validate_pair(key, main_feature, debug_feature):
     )
 
     minimum_direction_cosine = 1.0
+    minimum_candidate_length = math.inf
     minimum_length_ratio = math.inf
     maximum_length_ratio = 0
     for index, (source_start, source_end, candidate_start, candidate_end) in enumerate(zip(
@@ -78,7 +79,10 @@ def validate_pair(key, main_feature, debug_feature):
         candidate_dx = candidate_end[0] - candidate_start[0]
         candidate_dy = candidate_end[1] - candidate_start[1]
         candidate_length = math.hypot(candidate_dx, candidate_dy)
-        assert candidate_length > 0, f'{key}: segment {index} collapsed to zero length'
+        assert candidate_length >= MIN_SEGMENT_LENGTH - 0.01, (
+            f'{key}: segment {index} shrank below the absolute floor '
+            f'({candidate_length:.6f}m < {MIN_SEGMENT_LENGTH - 0.01:.2f}m)'
+        )
 
         length_ratio = candidate_length / source_length
         assert MIN_SEGMENT_LENGTH_RATIO <= length_ratio <= MAX_SEGMENT_LENGTH_RATIO, (
@@ -99,6 +103,7 @@ def validate_pair(key, main_feature, debug_feature):
         )
 
         minimum_direction_cosine = min(minimum_direction_cosine, direction_cosine)
+        minimum_candidate_length = min(minimum_candidate_length, candidate_length)
         minimum_length_ratio = min(minimum_length_ratio, length_ratio)
         maximum_length_ratio = max(maximum_length_ratio, length_ratio)
 
@@ -127,6 +132,7 @@ def validate_pair(key, main_feature, debug_feature):
         requested_offset,
         applied_offset,
         minimum_direction_cosine,
+        minimum_candidate_length,
         minimum_length_ratio,
         maximum_length_ratio,
     )
@@ -150,12 +156,13 @@ def main():
     requested_offsets = []
     applied_offsets = []
     minimum_direction_cosine = 1.0
+    minimum_candidate_length = math.inf
     minimum_length_ratio = math.inf
     maximum_length_ratio = 0
     reduced_count = 0
     for key, pair in sorted(pairs.items()):
         assert set(pair) == {'main', 'debug'}, f'{key}: incomplete main/debug pair'
-        requested, applied, direction_cosine, min_ratio, max_ratio = validate_pair(
+        requested, applied, direction_cosine, candidate_length, min_ratio, max_ratio = validate_pair(
             key,
             pair['main'],
             pair['debug'],
@@ -163,6 +170,7 @@ def main():
         requested_offsets.append(abs(requested))
         applied_offsets.append(abs(applied))
         minimum_direction_cosine = min(minimum_direction_cosine, direction_cosine)
+        minimum_candidate_length = min(minimum_candidate_length, candidate_length)
         minimum_length_ratio = min(minimum_length_ratio, min_ratio)
         maximum_length_ratio = max(maximum_length_ratio, max_ratio)
         if abs(applied) + 1e-9 < abs(requested):
@@ -174,7 +182,8 @@ def main():
         f'truthful offsets ({reduced_count} reduced; applied range '
         f'{min(applied_offsets):.3f}-{max(applied_offsets):.3f}m; requested max '
         f'{max(requested_offsets):.3f}m; max local bend '
-        f'{math.degrees(math.acos(minimum_direction_cosine)):.3f}°; segment ratios '
+        f'{math.degrees(math.acos(minimum_direction_cosine)):.3f}°; min rendered segment '
+        f'{minimum_candidate_length:.3f}m; segment ratios '
         f'{minimum_length_ratio:.3f}-{maximum_length_ratio:.3f}).'
     )
 

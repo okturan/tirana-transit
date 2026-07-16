@@ -3,51 +3,31 @@ import TransitMap from './components/TransitMap'
 import RouteSidebar from './components/RouteSidebar'
 import TimetableModal from './components/TimetableModal'
 import ErrorBoundary from './components/ErrorBoundary'
+import { filterKnownRouteIds, parseUrlState, serializeUrlState } from './urlState'
 import './App.css'
 
 function App() {
+  const [initialUrlState] = useState(() => parseUrlState(window.location.hash))
   const [routes, setRoutes] = useState([])
   const [routesGeoJSON, setRoutesGeoJSON] = useState(null)
   const [stopsGeoJSON, setStopsGeoJSON] = useState(null)
-  const [selectedRoutes, setSelectedRoutes] = useState(new Set())
-  const [showStops, setShowStops] = useState(false)
-  const [showDebug, setShowDebug] = useState(false)
+  const [selectedRoutes, setSelectedRoutes] = useState(() => new Set(initialUrlState.routeIds || []))
+  const [showStops, setShowStops] = useState(initialUrlState.showStops)
+  const [showDebug, setShowDebug] = useState(initialUrlState.showDebug)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [timetableRoute, setTimetableRoute] = useState(null)
 
-  // Load state from URL on initial load
-  useEffect(() => {
-    const hash = window.location.hash.slice(1)
-    if (hash) {
-      try {
-        const params = new URLSearchParams(hash)
-        const routesParam = params.get('routes')
-        const stopsParam = params.get('stops')
-        const debugParam = params.get('debug')
-        
-        if (routesParam) {
-          const routeIds = routesParam.split(',').filter(Boolean)
-          setSelectedRoutes(new Set(routeIds))
-        }
-        if (stopsParam === '1') setShowStops(true)
-        if (debugParam === '1') setShowDebug(true)
-      } catch (e) {
-        console.warn('Failed to parse URL state:', e)
-      }
-    }
-  }, [])
-
   // Update URL when state changes
   useEffect(() => {
-    const params = new URLSearchParams()
-    if (selectedRoutes.size > 0 && selectedRoutes.size !== routes.length) {
-      params.set('routes', Array.from(selectedRoutes).join(','))
-    }
-    if (showStops) params.set('stops', '1')
-    if (showDebug) params.set('debug', '1')
-    
-    const hash = params.toString()
+    if (routes.length === 0) return
+
+    const hash = serializeUrlState({
+      routeIds: Array.from(selectedRoutes),
+      totalRoutes: routes.length,
+      showStops,
+      showDebug
+    })
     window.location.hash = hash || ''
   }, [selectedRoutes, showStops, showDebug, routes.length])
 
@@ -58,9 +38,9 @@ function App() {
         setError(null)
 
         const [metadataRes, routesRes, stopsRes] = await Promise.all([
-          fetch('/data/route_metadata.json'),
-          fetch('/data/routes.geojson'),
-          fetch('/data/stops.geojson')
+          fetch(`${import.meta.env.BASE_URL}data/route_metadata.json`),
+          fetch(`${import.meta.env.BASE_URL}data/routes.geojson`),
+          fetch(`${import.meta.env.BASE_URL}data/stops.geojson`)
         ])
 
         // Check for HTTP errors
@@ -87,10 +67,16 @@ function App() {
         setRoutesGeoJSON(routesGeo)
         setStopsGeoJSON(stopsGeo)
         
-        // Only set all routes as selected if URL didn't specify
-        const hash = window.location.hash.slice(1)
-        if (!hash || !new URLSearchParams(hash).get('routes')) {
+        const urlRouteIds = filterKnownRouteIds(
+          parseUrlState(window.location.hash).routeIds,
+          metadata.map(route => route.route_id)
+        )
+
+        // Only set all routes as selected if URL didn't specify a route filter.
+        if (urlRouteIds === null) {
           setSelectedRoutes(new Set(metadata.map(r => r.route_id)))
+        } else {
+          setSelectedRoutes(new Set(urlRouteIds))
         }
       } catch (err) {
         console.error('Failed to load data:', err)

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22.12.0', '24']
+    defaults:
+      run:
+        working-directory: map-app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: map-app/package-lock.json
+      - run: npm ci --engine-strict
+      - run: npm audit --audit-level=high
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+
+  converter:
+    name: Python 3.13 converter
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gtfs-data
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: gtfs-data/requirements.txt
+      - run: python -m pip install --requirement requirements.txt
+      - name: Regenerate tracked map data
+        run: PYTHONHASHSEED=1 python convert_to_geojson.py
+      - name: Validate generated route geometry
+        run: python validate_generated_geometry.py
+      - name: Verify first regeneration is byte-exact
+        run: git diff --exit-code -- ../map-app/public/data
+      - name: Regenerate with a second hash seed
+        run: PYTHONHASHSEED=8675309 python convert_to_geojson.py
+      - name: Revalidate generated route geometry
+        run: python validate_generated_geometry.py
+      - name: Preserve generated map data
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: generated-map-data-${{ github.sha }}
+          path: map-app/public/data
+          retention-days: 7
+      - name: Verify the generated snapshot is current
+        run: git diff --exit-code -- ../map-app/public/data

@@ -3,6 +3,7 @@
 
 import csv
 import json
+import math
 import os
 import sys
 from collections import defaultdict
@@ -93,6 +94,12 @@ OFFSET_PER_ROUTE = 5  # meters - offset between adjacent routes (was 6m)
 MAX_TOTAL_OFFSET = 20  # meters - cap total offset (was 30m)
 PROXIMITY_THRESHOLD = 35  # meters - detection threshold for shared corridors
 CROSS_FAMILY_THRESHOLD = 0.40  # 40% - high threshold for cross-family corridor detection
+MIN_OFFSET_SEGMENT_LENGTH = 0.5  # meters - ignore near-duplicate GTFS vertices
+MIN_SEGMENT_LENGTH_RATIO = 0.5
+MAX_SEGMENT_LENGTH_RATIO = 2.0
+MIN_SEGMENT_DIRECTION_COSINE = 2 ** -0.5  # no more than 45 degrees of local bend
+OFFSET_RETRY_STEP = 0.25  # meters - deterministic search for the largest safe offset
+MIN_USEFUL_OFFSET = 0.25  # meters - smaller offsets are visually indistinguishable
 
 def sample_line_points(coords, interval_meters=50):
     """Sample points along a line at regular intervals."""
@@ -134,6 +141,144 @@ def calculate_corridor_sharing(shape1_coords, shape2_coords):
     except Exception as e:
         return 0
 
+
+def offset_vertices(line, offset_meters):
+    """Offset every projected vertex while preserving the full route shape."""
+    coordinates = list(line.coords)
+    if len(coordinates) < 2:
+        return line
+
+    segment_normals = []
+    for start, end in zip(coordinates, coordinates[1:]):
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = (dx * dx + dy * dy) ** 0.5
+        if length < MIN_OFFSET_SEGMENT_LENGTH:
+            segment_normals.append(None)
+        else:
+            segment_normals.append((-dy / length, dx / length))
+
+    def nearest_normal(index, step):
+        while 0 <= index < len(segment_normals):
+            if segment_normals[index] is not None:
+                return segment_normals[index]
+            index += step
+        return None
+
+    offset_coordinates = []
+    for index, (x, y) in enumerate(coordinates):
+        before = nearest_normal(index - 1, -1)
+        after = nearest_normal(index, 1)
+
+        if before is None and after is None:
+            offset_coordinates.append((x, y))
+            continue
+        if before is None:
+            normal = after
+            scale = offset_meters
+        elif after is None:
+            normal = before
+            scale = offset_meters
+        else:
+            combined_x = before[0] + after[0]
+            combined_y = before[1] + after[1]
+            combined_length = (combined_x * combined_x + combined_y * combined_y) ** 0.5
+            if combined_length < 1e-9:
+                normal = after
+                scale = offset_meters
+            else:
+                normal = (combined_x / combined_length, combined_y / combined_length)
+                projection = normal[0] * after[0] + normal[1] * after[1]
+                scale = offset_meters / projection if abs(projection) > 0.25 else offset_meters
+                maximum_scale = abs(offset_meters) * 2
+                scale = max(-maximum_scale, min(maximum_scale, scale))
+
+        offset_coordinates.append((x + normal[0] * scale, y + normal[1] * scale))
+
+    return LineString(offset_coordinates)
+
+
+def offset_preserves_route(original, candidate, offset_meters):
+    """Reject offsets that drop a meaningful section of the source route."""
+    if candidate.is_empty or candidate.geom_type != 'LineString':
+        return False
+
+    original_coordinates = list(original.coords)
+    candidate_coordinates = list(candidate.coords)
+    if len(original_coordinates) != len(candidate_coordinates):
+        return False
+
+    # An offset of a simple centerline must not introduce a loop or crossing.
+    if original.is_simple and not candidate.is_simple:
+        return False
+
+    # A global length check can hide short local reversals at sharp corners.
+    # Since offset_vertices preserves vertex correspondence, validate every
+    # meaningful source segment against its candidate segment directly.
+    for source_start, source_end, candidate_start, candidate_end in zip(
+        original_coordinates,
+        original_coordinates[1:],
+        candidate_coordinates,
+        candidate_coordinates[1:],
+    ):
+        source_dx = source_end[0] - source_start[0]
+        source_dy = source_end[1] - source_start[1]
+        source_length = math.hypot(source_dx, source_dy)
+        if source_length < MIN_OFFSET_SEGMENT_LENGTH:
+            continue
+
+        candidate_dx = candidate_end[0] - candidate_start[0]
+        candidate_dy = candidate_end[1] - candidate_start[1]
+        candidate_length = math.hypot(candidate_dx, candidate_dy)
+        if candidate_length < MIN_OFFSET_SEGMENT_LENGTH - 0.01:
+            return False
+
+        length_ratio = candidate_length / source_length
+        if not MIN_SEGMENT_LENGTH_RATIO <= length_ratio <= MAX_SEGMENT_LENGTH_RATIO:
+            return False
+
+        direction_dot_product = source_dx * candidate_dx + source_dy * candidate_dy
+        if direction_dot_product <= 0:
+            return False
+
+        direction_cosine = direction_dot_product / (source_length * candidate_length)
+        if direction_cosine < MIN_SEGMENT_DIRECTION_COSINE:
+            return False
+
+    original_length = original.length
+    if original_length == 0:
+        return False
+
+    length_ratio = candidate.length / original_length
+    if not 0.90 <= length_ratio <= 1.10:
+        return False
+
+    source_start = Point(original.coords[0])
+    source_end = Point(original.coords[-1])
+    candidate_start = Point(candidate.coords[0])
+    candidate_end = Point(candidate.coords[-1])
+    forward_distance = source_start.distance(candidate_start) + source_end.distance(candidate_end)
+    reverse_distance = source_start.distance(candidate_end) + source_end.distance(candidate_start)
+    endpoint_tolerance = max(100, abs(offset_meters) * 5)
+    return forward_distance <= endpoint_tolerance and forward_distance <= reverse_distance
+
+
+def decreasing_offset_candidates(requested_offset):
+    """Yield deterministic offset candidates from largest to smallest."""
+    sign = -1 if requested_offset < 0 else 1
+    requested_magnitude = abs(requested_offset)
+    yield requested_offset
+
+    candidate_magnitude = requested_magnitude - OFFSET_RETRY_STEP
+    while candidate_magnitude >= MIN_USEFUL_OFFSET - 1e-9:
+        yield sign * round(candidate_magnitude, 9)
+        candidate_magnitude -= OFFSET_RETRY_STEP
+
+
+def rounded_coordinates(coordinates, precision=8):
+    """Normalize projected output for stable cross-platform JSON snapshots."""
+    return [[round(x, precision), round(y, precision)] for x, y in coordinates]
+
 def get_route_base_number(route_name):
     """Extract base number from route name (e.g., '1A' -> '1', '10B' -> '10')."""
     return ''.join(c for c in route_name if c.isdigit()) or route_name
@@ -150,7 +295,7 @@ def detect_corridor_groups(shape_geometries, route_to_shapes, route_short_names)
         if not short_name:
             continue
         route_shapes[short_name] = []
-        for shape_id in shape_ids:
+        for shape_id in sorted(shape_ids):
             if shape_id in shape_geometries:
                 route_shapes[short_name].append(shape_geometries[shape_id])
 
@@ -316,65 +461,59 @@ def get_offset_for_shape(short_name, direction, corridor_assignments):
     return total
 
 def offset_line_geographic(coords, offset_meters):
-    """Offset a line by a given number of meters using geographic projection."""
+    """Return coordinates and the largest safe applied offset in meters."""
     if offset_meters == 0 or len(coords) < 2:
-        return coords
+        return rounded_coordinates(coords), 0
 
     # Check if this is a ring (closed loop) - start and end points are very close
     start = coords[0]
     end = coords[-1]
     is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001  # ~10m threshold
 
-    # For rings, remove the duplicate end point to make it a line
-    # parallel_offset works better on open lines
+    # For rings, remove the duplicate end point to make it a line.
     # IMPORTANT: Make a copy to avoid modifying the original list
     working_coords = coords[:-1] if is_ring else list(coords)
 
     if len(working_coords) < 2:
-        return coords
+        return rounded_coordinates(coords), 0
 
     try:
         line = LineString(working_coords)
         line_utm = transform(to_utm, line)
+        rounded_source = rounded_coordinates(working_coords)
+        rounded_source_utm = transform(to_utm, LineString(rounded_source))
 
-        distance = abs(offset_meters)
-        side = 'left' if offset_meters > 0 else 'right'
+        for candidate_offset in decreasing_offset_candidates(offset_meters):
+            offset_line_utm = offset_vertices(line_utm, candidate_offset)
+            if not offset_preserves_route(line_utm, offset_line_utm, candidate_offset):
+                continue
 
-        offset_line_utm = line_utm.parallel_offset(
-            distance,
-            side=side,
-            resolution=16,
-            join_style=2,
-            mitre_limit=2.0
+            offset_line = transform(to_wgs84, offset_line_utm)
+            rounded_candidate = rounded_coordinates(offset_line.coords)
+            rounded_candidate_utm = transform(to_utm, LineString(rounded_candidate))
+            if not offset_preserves_route(
+                rounded_source_utm,
+                rounded_candidate_utm,
+                candidate_offset,
+            ):
+                continue
+
+            if candidate_offset != offset_meters:
+                print(
+                    f"  Warning: reduced offset from {offset_meters:.3f}m "
+                    f"to {candidate_offset:.3f}m to preserve route geometry"
+                )
+            return rounded_candidate, candidate_offset
+
+        print(
+            f"  Warning: no safe offset up to {offset_meters:.3f}m; "
+            "using original geometry"
         )
-
-        if offset_line_utm.is_empty:
-            return coords
-
-        if offset_line_utm.geom_type == 'MultiLineString':
-            # For non-rings, take the longest segment
-            longest = max(offset_line_utm.geoms, key=lambda g: g.length)
-            offset_line_utm = longest
-
-        offset_line = transform(to_wgs84, offset_line_utm)
-        result_coords = list(offset_line.coords)
-
-        # Check if reversal needed (parallel_offset can reverse direction)
-        original_start = working_coords[0]
-        result_start = result_coords[0]
-        result_end = result_coords[-1]
-
-        dist_to_start = ((original_start[0] - result_start[0])**2 + (original_start[1] - result_start[1])**2)**0.5
-        dist_to_end = ((original_start[0] - result_end[0])**2 + (original_start[1] - result_end[1])**2)**0.5
-
-        if dist_to_end < dist_to_start:
-            result_coords = result_coords[::-1]
-
-        return [[c[0], c[1]] for c in result_coords]
+        return rounded_coordinates(working_coords), 0
 
     except Exception as e:
         print(f"  Warning: offset failed ({e}), using original geometry")
-        return coords
+        return rounded_coordinates(working_coords), 0
 
 # Load data
 print("Loading GTFS data...")
@@ -559,11 +698,13 @@ for route in routes:
                 # For non-ring B routes, flip the offset
                 total_offset = -total_offset
 
-            if total_offset != 0:
-                coords = offset_line_geographic(original_coords, total_offset)
+            requested_offset = total_offset
+            if requested_offset != 0:
+                coords, applied_offset = offset_line_geographic(original_coords, requested_offset)
             else:
                 # For rings, remove duplicate end point for cleaner rendering
-                coords = original_coords[:-1] if is_ring else original_coords
+                coords = rounded_coordinates(original_coords[:-1] if is_ring else original_coords)
+                applied_offset = 0
 
             # Main feature (with offset applied)
             feature = {
@@ -577,7 +718,8 @@ for route in routes:
                     "shape_id": shape_id,
                     "direction": direction,
                     "corridor_group": corridor_info[0],
-                    "offset_meters": total_offset,
+                    "requested_offset_meters": requested_offset,
+                    "offset_meters": applied_offset,
                     "debug": False
                 },
                 "geometry": {
@@ -592,7 +734,7 @@ for route in routes:
             start = original_coords[0]
             end = original_coords[-1]
             is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001
-            debug_coords = original_coords[:-1] if is_ring else original_coords
+            debug_coords = rounded_coordinates(original_coords[:-1] if is_ring else original_coords)
             
             debug_feature = {
                 "type": "Feature",
@@ -625,7 +767,7 @@ stops_features = []
 for stop in stops:
     if stop['stop_lat'] and stop['stop_lon']:
         stop_id = stop['stop_id']
-        associated_routes = list(stop_to_routes.get(stop_id, []))
+        associated_routes = sorted(stop_to_routes.get(stop_id, []))
 
         feature = {
             "type": "Feature",
@@ -637,7 +779,7 @@ for stop in stops:
             },
             "geometry": {
                 "type": "Point",
-                "coordinates": [float(stop['stop_lon']), float(stop['stop_lat'])]
+                "coordinates": [round(float(stop['stop_lon']), 8), round(float(stop['stop_lat']), 8)]
             }
         }
         stops_features.append(feature)

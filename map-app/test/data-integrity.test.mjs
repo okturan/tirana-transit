@@ -10,6 +10,21 @@ const [metadata, routes, stops] = await Promise.all([
   readJson('stops.geojson')
 ])
 
+const radians = degrees => degrees * Math.PI / 180
+
+const distanceMeters = ([lon1, lat1], [lon2, lat2]) => {
+  const earthRadius = 6_371_000
+  const latitudeDelta = radians(lat2 - lat1)
+  const longitudeDelta = radians(lon2 - lon1)
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(longitudeDelta / 2) ** 2
+  return 2 * earthRadius * Math.asin(Math.sqrt(a))
+}
+
+const lineLengthMeters = coordinates => coordinates
+  .slice(1)
+  .reduce((length, coordinate, index) => length + distanceMeters(coordinates[index], coordinate), 0)
+
 test('bundled snapshot has the documented route and stop coverage', () => {
   assert.equal(metadata.length, 27)
   assert.equal(stops.type, 'FeatureCollection')
@@ -37,6 +52,35 @@ test('route geometry is paired, valid, and linked to metadata', () => {
   }
 
   assert.deepEqual(renderedRouteIds, knownRouteIds)
+})
+
+test('every rendered shape preserves its complete debug centerline', () => {
+  const pairs = new Map()
+
+  for (const feature of routes.features) {
+    const key = `${feature.properties.route_id}:${feature.properties.shape_id}`
+    const pair = pairs.get(key) || { main: [], debug: [] }
+    pair[feature.properties.debug ? 'debug' : 'main'].push(feature)
+    pairs.set(key, pair)
+  }
+
+  assert.equal(pairs.size, 48)
+
+  for (const [key, pair] of pairs) {
+    assert.equal(pair.main.length, 1, `${key} should have one rendered geometry`)
+    assert.equal(pair.debug.length, 1, `${key} should have one debug centerline`)
+
+    const mainCoordinates = pair.main[0].geometry.coordinates
+    const debugCoordinates = pair.debug[0].geometry.coordinates
+    const lengthRatio = lineLengthMeters(mainCoordinates) / lineLengthMeters(debugCoordinates)
+    assert.ok(lengthRatio >= 0.90 && lengthRatio <= 1.10, `${key} lost route geometry (${lengthRatio})`)
+
+    const forwardEndpointGap = distanceMeters(mainCoordinates[0], debugCoordinates[0])
+      + distanceMeters(mainCoordinates.at(-1), debugCoordinates.at(-1))
+    const reverseEndpointGap = distanceMeters(mainCoordinates[0], debugCoordinates.at(-1))
+      + distanceMeters(mainCoordinates.at(-1), debugCoordinates[0])
+    assert.ok(Math.min(forwardEndpointGap, reverseEndpointGap) <= 100, `${key} lost a route endpoint`)
+  }
 })
 
 test('every stop is a valid point linked only to known routes', () => {

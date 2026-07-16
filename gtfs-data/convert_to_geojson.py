@@ -134,6 +134,90 @@ def calculate_corridor_sharing(shape1_coords, shape2_coords):
     except Exception as e:
         return 0
 
+
+def offset_vertices(line, offset_meters):
+    """Offset every projected vertex while preserving the full route shape."""
+    coordinates = list(line.coords)
+    if len(coordinates) < 2:
+        return line
+
+    segment_normals = []
+    for start, end in zip(coordinates, coordinates[1:]):
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = (dx * dx + dy * dy) ** 0.5
+        if length == 0:
+            segment_normals.append(None)
+        else:
+            segment_normals.append((-dy / length, dx / length))
+
+    def nearest_normal(index, step):
+        while 0 <= index < len(segment_normals):
+            if segment_normals[index] is not None:
+                return segment_normals[index]
+            index += step
+        return None
+
+    offset_coordinates = []
+    for index, (x, y) in enumerate(coordinates):
+        before = nearest_normal(index - 1, -1)
+        after = nearest_normal(index, 1)
+
+        if before is None and after is None:
+            offset_coordinates.append((x, y))
+            continue
+        if before is None:
+            normal = after
+            scale = offset_meters
+        elif after is None:
+            normal = before
+            scale = offset_meters
+        else:
+            combined_x = before[0] + after[0]
+            combined_y = before[1] + after[1]
+            combined_length = (combined_x * combined_x + combined_y * combined_y) ** 0.5
+            if combined_length < 1e-9:
+                normal = after
+                scale = offset_meters
+            else:
+                normal = (combined_x / combined_length, combined_y / combined_length)
+                projection = normal[0] * after[0] + normal[1] * after[1]
+                scale = offset_meters / projection if abs(projection) > 0.25 else offset_meters
+                maximum_scale = abs(offset_meters) * 3
+                scale = max(-maximum_scale, min(maximum_scale, scale))
+
+        offset_coordinates.append((x + normal[0] * scale, y + normal[1] * scale))
+
+    return LineString(offset_coordinates)
+
+
+def offset_preserves_route(original, candidate, offset_meters):
+    """Reject offsets that drop a meaningful section of the source route."""
+    if candidate.is_empty or candidate.geom_type != 'LineString':
+        return False
+
+    original_length = original.length
+    if original_length == 0:
+        return False
+
+    length_ratio = candidate.length / original_length
+    if not 0.90 <= length_ratio <= 1.10:
+        return False
+
+    source_start = Point(original.coords[0])
+    source_end = Point(original.coords[-1])
+    candidate_start = Point(candidate.coords[0])
+    candidate_end = Point(candidate.coords[-1])
+    forward_distance = source_start.distance(candidate_start) + source_end.distance(candidate_end)
+    reverse_distance = source_start.distance(candidate_end) + source_end.distance(candidate_start)
+    endpoint_tolerance = max(100, abs(offset_meters) * 5)
+    return min(forward_distance, reverse_distance) <= endpoint_tolerance
+
+
+def rounded_coordinates(coordinates, precision=8):
+    """Normalize projected output for stable cross-platform JSON snapshots."""
+    return [[round(x, precision), round(y, precision)] for x, y in coordinates]
+
 def get_route_base_number(route_name):
     """Extract base number from route name (e.g., '1A' -> '1', '10B' -> '10')."""
     return ''.join(c for c in route_name if c.isdigit()) or route_name
@@ -150,7 +234,7 @@ def detect_corridor_groups(shape_geometries, route_to_shapes, route_short_names)
         if not short_name:
             continue
         route_shapes[short_name] = []
-        for shape_id in shape_ids:
+        for shape_id in sorted(shape_ids):
             if shape_id in shape_geometries:
                 route_shapes[short_name].append(shape_geometries[shape_id])
 
@@ -349,12 +433,20 @@ def offset_line_geographic(coords, offset_meters):
         )
 
         if offset_line_utm.is_empty:
-            return coords
+            offset_line_utm = LineString()
 
         if offset_line_utm.geom_type == 'MultiLineString':
-            # For non-rings, take the longest segment
-            longest = max(offset_line_utm.geoms, key=lambda g: g.length)
-            offset_line_utm = longest
+            # A fragmented parallel offset can silently discard most of a route.
+            # The vertex fallback below preserves every source segment instead.
+            offset_line_utm = LineString()
+
+        if not offset_preserves_route(line_utm, offset_line_utm, offset_meters):
+            print("  Warning: fragmented offset detected; using vertex-preserving fallback")
+            offset_line_utm = offset_vertices(line_utm, offset_meters)
+
+        if not offset_preserves_route(line_utm, offset_line_utm, offset_meters):
+            print("  Warning: offset validation failed; using original geometry")
+            offset_line_utm = line_utm
 
         offset_line = transform(to_wgs84, offset_line_utm)
         result_coords = list(offset_line.coords)
@@ -370,11 +462,11 @@ def offset_line_geographic(coords, offset_meters):
         if dist_to_end < dist_to_start:
             result_coords = result_coords[::-1]
 
-        return [[c[0], c[1]] for c in result_coords]
+        return rounded_coordinates(result_coords)
 
     except Exception as e:
         print(f"  Warning: offset failed ({e}), using original geometry")
-        return coords
+        return rounded_coordinates(coords)
 
 # Load data
 print("Loading GTFS data...")
@@ -563,7 +655,7 @@ for route in routes:
                 coords = offset_line_geographic(original_coords, total_offset)
             else:
                 # For rings, remove duplicate end point for cleaner rendering
-                coords = original_coords[:-1] if is_ring else original_coords
+                coords = rounded_coordinates(original_coords[:-1] if is_ring else original_coords)
 
             # Main feature (with offset applied)
             feature = {
@@ -592,7 +684,7 @@ for route in routes:
             start = original_coords[0]
             end = original_coords[-1]
             is_ring = ((start[0] - end[0])**2 + (start[1] - end[1])**2)**0.5 < 0.0001
-            debug_coords = original_coords[:-1] if is_ring else original_coords
+            debug_coords = rounded_coordinates(original_coords[:-1] if is_ring else original_coords)
             
             debug_feature = {
                 "type": "Feature",
@@ -625,7 +717,7 @@ stops_features = []
 for stop in stops:
     if stop['stop_lat'] and stop['stop_lon']:
         stop_id = stop['stop_id']
-        associated_routes = list(stop_to_routes.get(stop_id, []))
+        associated_routes = sorted(stop_to_routes.get(stop_id, []))
 
         feature = {
             "type": "Feature",
@@ -637,7 +729,7 @@ for stop in stops:
             },
             "geometry": {
                 "type": "Point",
-                "coordinates": [float(stop['stop_lon']), float(stop['stop_lat'])]
+                "coordinates": [round(float(stop['stop_lon']), 8), round(float(stop['stop_lat']), 8)]
             }
         }
         stops_features.append(feature)

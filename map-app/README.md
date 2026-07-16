@@ -26,7 +26,7 @@ These figures describe the checked-in snapshot, not necessarily the current live
 
 ## Run locally
 
-Vite 7 requires Node.js 20.19+ or 22.12+.
+The application requires Node.js 22.12 or newer.
 
 ```bash
 npm ci
@@ -43,7 +43,7 @@ npm run lint
 npm run build
 ```
 
-The tests protect shareable URL state and validate the checked-in GTFS-derived route, stop, geometry, timetable, and trip-count contracts.
+The tests protect shareable URL state and validate the checked-in GTFS-derived route, stop, geometry, timetable, and trip-count contracts, including per-shape length and endpoint preservation.
 
 Vite writes the production bundle to `dist/`.
 

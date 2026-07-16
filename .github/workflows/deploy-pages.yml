@@ -29,7 +29,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: '22.12.0'
           cache: npm
           cache-dependency-path: map-app/package-lock.json
       - name: Configure GitHub Pages
@@ -37,7 +37,7 @@ jobs:
       - name: Install and verify
         working-directory: map-app
         run: |
-          npm ci
+          npm ci --engine-strict
           npm audit --audit-level=high
           npm test
           npm run lint

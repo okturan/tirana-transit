@@ -19,7 +19,7 @@ An interactive map of Tirana's public bus network backed by a reproducible GTFS-
 
 | | Current state |
 |---|---|
-| Application | Working local showcase; no public deployment is currently configured or verified |
+| Application | GitHub Pages workflow configured for [okturan.github.io/tirana-transit](https://okturan.github.io/tirana-transit/); deployments come from `main` |
 | Data snapshot | Municipality of Tirana feed `0.2.0`, covering 2026-01-01 through 2026-12-31 |
 | Bundled coverage | 27 routes, 491 stops, and 16,642 scheduled trips |
 | Scope | Static schedule visualization; not live vehicle tracking or a journey planner |
@@ -28,7 +28,7 @@ The counts above describe the bundled snapshot, not necessarily the municipality
 
 ## Quick start
 
-Vite 7 requires Node.js 20.19+ or 22.12+.
+The application requires Node.js 22.12 or newer.
 
 ```bash
 cd map-app
@@ -44,11 +44,11 @@ Open `http://localhost:5173`.
 cd gtfs-data
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install shapely pyproj
+python -m pip install --requirement requirements.txt
 python convert_to_geojson.py
 ```
 
-The converter reads the bundled GTFS tables and writes generated files to `map-app/public/data/`. Set `OUTPUT_DIR` to validate a conversion without replacing the tracked snapshot.
+The converter uses Python 3.13 and a pinned geometry stack, reads the bundled GTFS tables, and writes generated files to `map-app/public/data/`. It rejects fragmented offsets that would discard route segments and normalizes output for stable snapshots. Set `OUTPUT_DIR` to validate a conversion without replacing the tracked snapshot.
 
 ## Architecture
 
@@ -71,7 +71,11 @@ npm run lint
 npm run build
 
 cd ../gtfs-data
-OUTPUT_DIR=/tmp/tirana-transit-output python3 convert_to_geojson.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --requirement requirements.txt
+python convert_to_geojson.py
+git diff --exit-code -- ../map-app/public/data
 ```
 
 ## Licensing and provenance

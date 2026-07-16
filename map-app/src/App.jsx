@@ -3,7 +3,7 @@ import TransitMap from './components/TransitMap'
 import RouteSidebar from './components/RouteSidebar'
 import TimetableModal from './components/TimetableModal'
 import ErrorBoundary from './components/ErrorBoundary'
-import { parseUrlState, serializeUrlState } from './urlState'
+import { filterKnownRouteIds, parseUrlState, serializeUrlState } from './urlState'
 import './App.css'
 
 function App() {
@@ -67,9 +67,16 @@ function App() {
         setRoutesGeoJSON(routesGeo)
         setStopsGeoJSON(stopsGeo)
         
-        // Only set all routes as selected if URL didn't specify
-        if (parseUrlState(window.location.hash).routeIds === null) {
+        const urlRouteIds = filterKnownRouteIds(
+          parseUrlState(window.location.hash).routeIds,
+          metadata.map(route => route.route_id)
+        )
+
+        // Only set all routes as selected if URL didn't specify a route filter.
+        if (urlRouteIds === null) {
           setSelectedRoutes(new Set(metadata.map(r => r.route_id)))
+        } else {
+          setSelectedRoutes(new Set(urlRouteIds))
         }
       } catch (err) {
         console.error('Failed to load data:', err)

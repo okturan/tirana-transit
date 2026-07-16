@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseUrlState, serializeUrlState } from '../src/urlState.js'
+import { filterKnownRouteIds, parseUrlState, serializeUrlState } from '../src/urlState.js'
 
 test('parses route and display state from a URL hash', () => {
   assert.deepEqual(parseUrlState('#routes=1,3,1,%20&stops=1&debug=1'), {
@@ -39,4 +39,10 @@ test('serializes partial and empty selections for shareable views', () => {
     showStops: false,
     showDebug: false
   }), 'routes=')
+})
+
+test('drops unknown route IDs after the route catalog loads', () => {
+  assert.deepEqual(filterKnownRouteIds(['1', 'unknown', '3'], ['1', '2', '3']), ['1', '3'])
+  assert.deepEqual(filterKnownRouteIds([], ['1', '2', '3']), [])
+  assert.equal(filterKnownRouteIds(null, ['1', '2', '3']), null)
 })

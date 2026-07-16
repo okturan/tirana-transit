@@ -24,3 +24,9 @@ export function serializeUrlState({ routeIds, totalRoutes, showStops, showDebug 
 
   return params.toString()
 }
+
+export function filterKnownRouteIds(routeIds, knownRouteIds) {
+  if (routeIds === null) return null
+  const known = new Set(knownRouteIds)
+  return routeIds.filter(routeId => known.has(routeId))
+}

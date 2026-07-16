@@ -19,7 +19,9 @@ DATA_PATH = os.path.join(
     'routes.geojson',
 )
 MIN_SEGMENT_LENGTH = 0.5
-ROUNDING_DISTANCE_TOLERANCE = 0.01
+MIN_SEGMENT_LENGTH_RATIO = 0.5
+MAX_SEGMENT_LENGTH_RATIO = 2.0
+MIN_SEGMENT_DIRECTION_COSINE = 2 ** -0.5
 ENDPOINT_TOLERANCE = 100
 
 to_utm = pyproj.Transformer.from_crs(
@@ -58,6 +60,9 @@ def validate_pair(key, main_feature, debug_feature):
         f'{key}: rendered endpoints moved {endpoint_gap:.3f}m'
     )
 
+    minimum_direction_cosine = 1.0
+    minimum_length_ratio = math.inf
+    maximum_length_ratio = 0
     for index, (source_start, source_end, candidate_start, candidate_end) in enumerate(zip(
         debug.coords,
         list(debug.coords)[1:],
@@ -73,9 +78,13 @@ def validate_pair(key, main_feature, debug_feature):
         candidate_dx = candidate_end[0] - candidate_start[0]
         candidate_dy = candidate_end[1] - candidate_start[1]
         candidate_length = math.hypot(candidate_dx, candidate_dy)
-        assert candidate_length >= MIN_SEGMENT_LENGTH - ROUNDING_DISTANCE_TOLERANCE, (
-            f'{key}: segment {index} collapsed from {source_length:.3f}m '
-            f'to {candidate_length:.3f}m'
+        assert candidate_length > 0, f'{key}: segment {index} collapsed to zero length'
+
+        length_ratio = candidate_length / source_length
+        assert MIN_SEGMENT_LENGTH_RATIO <= length_ratio <= MAX_SEGMENT_LENGTH_RATIO, (
+            f'{key}: segment {index} length ratio {length_ratio:.6f} is outside '
+            f'{MIN_SEGMENT_LENGTH_RATIO:.1f}-{MAX_SEGMENT_LENGTH_RATIO:.1f} '
+            f'({source_length:.3f}m source, {candidate_length:.3f}m rendered)'
         )
 
         direction_dot_product = source_dx * candidate_dx + source_dy * candidate_dy
@@ -83,6 +92,15 @@ def validate_pair(key, main_feature, debug_feature):
             f'{key}: segment {index} reverses direction '
             f'({source_length:.3f}m source, {candidate_length:.3f}m rendered)'
         )
+        direction_cosine = direction_dot_product / (source_length * candidate_length)
+        assert direction_cosine >= MIN_SEGMENT_DIRECTION_COSINE, (
+            f'{key}: segment {index} bends {math.degrees(math.acos(direction_cosine)):.3f}° '
+            f'(cosine {direction_cosine:.6f})'
+        )
+
+        minimum_direction_cosine = min(minimum_direction_cosine, direction_cosine)
+        minimum_length_ratio = min(minimum_length_ratio, length_ratio)
+        maximum_length_ratio = max(maximum_length_ratio, length_ratio)
 
     assert not (debug.is_simple and not main.is_simple), (
         f'{key}: offset introduced a self-intersection into a simple centerline'
@@ -105,7 +123,13 @@ def validate_pair(key, main_feature, debug_feature):
             f'{key}: zero applied offset does not match the centerline'
         )
 
-    return requested_offset, applied_offset
+    return (
+        requested_offset,
+        applied_offset,
+        minimum_direction_cosine,
+        minimum_length_ratio,
+        maximum_length_ratio,
+    )
 
 
 def main():
@@ -125,12 +149,22 @@ def main():
 
     requested_offsets = []
     applied_offsets = []
+    minimum_direction_cosine = 1.0
+    minimum_length_ratio = math.inf
+    maximum_length_ratio = 0
     reduced_count = 0
     for key, pair in sorted(pairs.items()):
         assert set(pair) == {'main', 'debug'}, f'{key}: incomplete main/debug pair'
-        requested, applied = validate_pair(key, pair['main'], pair['debug'])
+        requested, applied, direction_cosine, min_ratio, max_ratio = validate_pair(
+            key,
+            pair['main'],
+            pair['debug'],
+        )
         requested_offsets.append(abs(requested))
         applied_offsets.append(abs(applied))
+        minimum_direction_cosine = min(minimum_direction_cosine, direction_cosine)
+        minimum_length_ratio = min(minimum_length_ratio, min_ratio)
+        maximum_length_ratio = max(maximum_length_ratio, max_ratio)
         if abs(applied) + 1e-9 < abs(requested):
             reduced_count += 1
 
@@ -139,7 +173,9 @@ def main():
         'self-intersections, equal vertex counts, safe lengths/endpoints, and '
         f'truthful offsets ({reduced_count} reduced; applied range '
         f'{min(applied_offsets):.3f}-{max(applied_offsets):.3f}m; requested max '
-        f'{max(requested_offsets):.3f}m).'
+        f'{max(requested_offsets):.3f}m; max local bend '
+        f'{math.degrees(math.acos(minimum_direction_cosine)):.3f}°; segment ratios '
+        f'{minimum_length_ratio:.3f}-{maximum_length_ratio:.3f}).'
     )
 
 

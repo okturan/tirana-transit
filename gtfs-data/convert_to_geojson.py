@@ -3,6 +3,7 @@
 
 import csv
 import json
+import math
 import os
 import sys
 from collections import defaultdict
@@ -94,6 +95,9 @@ MAX_TOTAL_OFFSET = 20  # meters - cap total offset (was 30m)
 PROXIMITY_THRESHOLD = 35  # meters - detection threshold for shared corridors
 CROSS_FAMILY_THRESHOLD = 0.40  # 40% - high threshold for cross-family corridor detection
 MIN_OFFSET_SEGMENT_LENGTH = 0.5  # meters - ignore near-duplicate GTFS vertices
+MIN_SEGMENT_LENGTH_RATIO = 0.5
+MAX_SEGMENT_LENGTH_RATIO = 2.0
+MIN_SEGMENT_DIRECTION_COSINE = 2 ** -0.5  # no more than 45 degrees of local bend
 OFFSET_RETRY_STEP = 0.25  # meters - deterministic search for the largest safe offset
 MIN_USEFUL_OFFSET = 0.25  # meters - smaller offsets are visually indistinguishable
 
@@ -219,18 +223,26 @@ def offset_preserves_route(original, candidate, offset_meters):
     ):
         source_dx = source_end[0] - source_start[0]
         source_dy = source_end[1] - source_start[1]
-        source_length = (source_dx * source_dx + source_dy * source_dy) ** 0.5
+        source_length = math.hypot(source_dx, source_dy)
         if source_length < MIN_OFFSET_SEGMENT_LENGTH:
             continue
 
         candidate_dx = candidate_end[0] - candidate_start[0]
         candidate_dy = candidate_end[1] - candidate_start[1]
-        candidate_length = (candidate_dx * candidate_dx + candidate_dy * candidate_dy) ** 0.5
-        if candidate_length < MIN_OFFSET_SEGMENT_LENGTH:
+        candidate_length = math.hypot(candidate_dx, candidate_dy)
+        if candidate_length == 0:
+            return False
+
+        length_ratio = candidate_length / source_length
+        if not MIN_SEGMENT_LENGTH_RATIO <= length_ratio <= MAX_SEGMENT_LENGTH_RATIO:
             return False
 
         direction_dot_product = source_dx * candidate_dx + source_dy * candidate_dy
         if direction_dot_product <= 0:
+            return False
+
+        direction_cosine = direction_dot_product / (source_length * candidate_length)
+        if direction_cosine < MIN_SEGMENT_DIRECTION_COSINE:
             return False
 
     original_length = original.length
@@ -468,10 +480,22 @@ def offset_line_geographic(coords, offset_meters):
     try:
         line = LineString(working_coords)
         line_utm = transform(to_utm, line)
+        rounded_source = rounded_coordinates(working_coords)
+        rounded_source_utm = transform(to_utm, LineString(rounded_source))
 
         for candidate_offset in decreasing_offset_candidates(offset_meters):
             offset_line_utm = offset_vertices(line_utm, candidate_offset)
             if not offset_preserves_route(line_utm, offset_line_utm, candidate_offset):
+                continue
+
+            offset_line = transform(to_wgs84, offset_line_utm)
+            rounded_candidate = rounded_coordinates(offset_line.coords)
+            rounded_candidate_utm = transform(to_utm, LineString(rounded_candidate))
+            if not offset_preserves_route(
+                rounded_source_utm,
+                rounded_candidate_utm,
+                candidate_offset,
+            ):
                 continue
 
             if candidate_offset != offset_meters:
@@ -479,8 +503,7 @@ def offset_line_geographic(coords, offset_meters):
                     f"  Warning: reduced offset from {offset_meters:.3f}m "
                     f"to {candidate_offset:.3f}m to preserve route geometry"
                 )
-            offset_line = transform(to_wgs84, offset_line_utm)
-            return rounded_coordinates(offset_line.coords), candidate_offset
+            return rounded_candidate, candidate_offset
 
         print(
             f"  Warning: no safe offset up to {offset_meters:.3f}m; "

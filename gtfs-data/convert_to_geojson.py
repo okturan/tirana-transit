@@ -93,6 +93,7 @@ OFFSET_PER_ROUTE = 5  # meters - offset between adjacent routes (was 6m)
 MAX_TOTAL_OFFSET = 20  # meters - cap total offset (was 30m)
 PROXIMITY_THRESHOLD = 35  # meters - detection threshold for shared corridors
 CROSS_FAMILY_THRESHOLD = 0.40  # 40% - high threshold for cross-family corridor detection
+MIN_OFFSET_SEGMENT_LENGTH = 0.5  # meters - ignore near-duplicate GTFS vertices
 
 def sample_line_points(coords, interval_meters=50):
     """Sample points along a line at regular intervals."""
@@ -146,7 +147,7 @@ def offset_vertices(line, offset_meters):
         dx = end[0] - start[0]
         dy = end[1] - start[1]
         length = (dx * dx + dy * dy) ** 0.5
-        if length == 0:
+        if length < MIN_OFFSET_SEGMENT_LENGTH:
             segment_normals.append(None)
         else:
             segment_normals.append((-dy / length, dx / length))

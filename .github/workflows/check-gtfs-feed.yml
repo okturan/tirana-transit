@@ -1,0 +1,66 @@
+name: Check GTFS feed
+
+on:
+  schedule:
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gtfs-feed-check
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: Compare municipality feed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Verify comparison behavior
+        working-directory: gtfs-data
+        run: python -m unittest -v test_check_feed_update.py
+
+      - name: Download current municipality feed
+        run: |
+          mkdir -p feed-check
+          curl \
+            --fail \
+            --location \
+            --retry 3 \
+            --retry-all-errors \
+            --connect-timeout 15 \
+            --max-time 90 \
+            --output feed-check/candidate.zip \
+            https://pt.tirana.al/gtfs/gtfs.zip
+
+      - name: Compare snapshots
+        run: |
+          python gtfs-data/check_feed_update.py \
+            --baseline gtfs-data/gtfs.zip \
+            --candidate feed-check/candidate.zip \
+            --source-url https://pt.tirana.al/gtfs/gtfs.zip \
+            --json feed-check/report.json \
+            --markdown feed-check/report.md
+          cat feed-check/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve freshness report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gtfs-freshness-${{ github.run_id }}
+          path: |
+            feed-check/report.json
+            feed-check/report.md
+          retention-days: 14

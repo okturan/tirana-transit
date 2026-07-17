@@ -28,7 +28,7 @@ The counts above describe the bundled snapshot, not necessarily the municipality
 
 ## Quick start
 
-The application requires Node.js 22.12 or newer.
+The application requires Node.js 22.13 or newer.
 
 ```bash
 cd map-app
@@ -77,6 +77,8 @@ python -m pip install --requirement requirements.txt
 python convert_to_geojson.py
 git diff --exit-code -- ../map-app/public/data
 ```
+
+Dependency maintenance is intentionally low-noise. Weekly compatible npm updates are grouped together, while coupled Vite and ESLint majors are grouped with their matching plugins so Dependabot does not propose peer-incompatible half-upgrades. CI verifies the browser application on the minimum supported Node 22 line and current Node 24, then independently regenerates and validates the transit geometry on Python 3.13.
 
 ## Licensing and provenance
 

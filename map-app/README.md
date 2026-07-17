@@ -26,7 +26,7 @@ These figures describe the checked-in snapshot, not necessarily the current live
 
 ## Run locally
 
-The application requires Node.js 22.12 or newer.
+The application requires Node.js 22.13 or newer.
 
 ```bash
 npm ci

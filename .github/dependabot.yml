@@ -4,7 +4,7 @@ updates:
     directory: /map-app
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
       compatible-npm-updates:
         patterns:
@@ -12,6 +12,18 @@ updates:
         update-types:
           - minor
           - patch
+      vite-major:
+        patterns:
+          - vite
+          - "@vitejs/plugin-react"
+        update-types:
+          - major
+      eslint-major:
+        patterns:
+          - eslint
+          - "@eslint/js"
+        update-types:
+          - major
 
   - package-ecosystem: github-actions
     directory: /

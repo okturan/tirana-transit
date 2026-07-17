@@ -50,6 +50,23 @@ python convert_to_geojson.py
 
 The converter uses Python 3.13 and a pinned geometry stack, reads the bundled GTFS tables, and writes generated files to `map-app/public/data/`. Its vertex-preserving offset algorithm retains every route segment and normalizes output for stable cross-platform snapshots. Set `OUTPUT_DIR` to validate a conversion without replacing the tracked snapshot.
 
+### Check the municipality feed
+
+The monthly [`Check GTFS feed`](./.github/workflows/check-gtfs-feed.yml) workflow downloads the declared municipality source, compares it with the bundled archive, and publishes versions, coverage dates, record-count deltas, changed filenames, and archive hashes in the run summary and a retained report artifact. It is deliberately read-only: a detected update still requires human review, attribution preservation, local regeneration, and green CI before tracked data changes.
+
+Run the same comparison locally:
+
+```bash
+curl --fail --location --output /tmp/tirana-gtfs.zip \
+  https://pt.tirana.al/gtfs/gtfs.zip
+python gtfs-data/check_feed_update.py \
+  --baseline gtfs-data/gtfs.zip \
+  --candidate /tmp/tirana-gtfs.zip \
+  --source-url https://pt.tirana.al/gtfs/gtfs.zip \
+  --json /tmp/tirana-gtfs-report.json \
+  --markdown /tmp/tirana-gtfs-report.md
+```
+
 ## Architecture
 
 | Path | Responsibility |

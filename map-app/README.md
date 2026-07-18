@@ -17,8 +17,8 @@ Interactive map of public bus routes in Tirana, Albania. It turns the repository
 | Metric | Value |
 |---|---|
 | Routes | 27 (1A-B, 2, 3A-C, 4, 5A-B, 6, 8A-C, 9A-B, 10A-C, 11, 12A-B, 13A-B, 15A-B, 16A-B) |
-| Stops | 491 |
-| Trips | 16,642 |
+| Stops | 490 |
+| Trips | 17,474 |
 | Service period | January 2026 to December 2026 |
 | Data source | [Municipality of Tirana GTFS](https://pt.tirana.al/gtfs/gtfs.zip), feed `0.2.0` |
 

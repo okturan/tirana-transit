@@ -21,10 +21,11 @@ An interactive map of Tirana's public bus network backed by a reproducible GTFS-
 |---|---|
 | Application | GitHub Pages workflow configured for [okturan.github.io/tirana-transit](https://okturan.github.io/tirana-transit/); deployments come from `main` |
 | Data snapshot | Municipality of Tirana feed `0.2.0`, covering 2026-01-01 through 2026-12-31 |
-| Bundled coverage | 27 routes, 491 stops, and 16,642 scheduled trips |
+| Bundled coverage | 27 routes, 490 stops, and 17,474 scheduled trips |
 | Scope | Static schedule visualization; not live vehicle tracking or a journey planner |
 
 The counts above describe the bundled snapshot, not necessarily the municipality's current live network. The source snapshot is available from [pt.tirana.al](https://pt.tirana.al/gtfs/gtfs.zip).
+Its retrieval time, archive hash, license, attribution, and source-table counts are recorded in [`gtfs-data/snapshot-manifest.json`](./gtfs-data/snapshot-manifest.json) and verified in CI.
 
 ## Quick start
 

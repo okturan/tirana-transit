@@ -9,6 +9,9 @@ const [metadata, routes, stops] = await Promise.all([
   readJson('routes.geojson'),
   readJson('stops.geojson')
 ])
+const snapshotManifest = JSON.parse(
+  await readFile(new URL('../../gtfs-data/snapshot-manifest.json', import.meta.url), 'utf8')
+)
 
 const radians = degrees => degrees * Math.PI / 180
 
@@ -26,9 +29,9 @@ const lineLengthMeters = coordinates => coordinates
   .reduce((length, coordinate, index) => length + distanceMeters(coordinates[index], coordinate), 0)
 
 test('bundled snapshot has the documented route and stop coverage', () => {
-  assert.equal(metadata.length, 27)
+  assert.equal(metadata.length, snapshotManifest.records['routes.txt'])
   assert.equal(stops.type, 'FeatureCollection')
-  assert.equal(stops.features.length, 491)
+  assert.equal(stops.features.length, snapshotManifest.records['stops.txt'])
 
   const routeIds = metadata.map(route => route.route_id)
   assert.equal(new Set(routeIds).size, routeIds.length)
@@ -113,5 +116,5 @@ test('metadata schedules use valid service keys and departure times', () => {
 test('source GTFS contains the documented number of trips', async () => {
   const trips = await readFile(new URL('../../gtfs-data/trips.txt', import.meta.url), 'utf8')
   const rows = trips.trimEnd().split(/\r?\n/)
-  assert.equal(rows.length - 1, 16_642)
+  assert.equal(rows.length - 1, snapshotManifest.records['trips.txt'])
 })

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sourceUrl": "https://pt.tirana.al/gtfs/gtfs.zip",
+  "retrievedAt": "2026-07-17T23:59:06.305360+00:00",
+  "archiveSha256": "9a3f7b87398853fdd4e0ae94ae83280d543ebd1e83c4f25fa0a4077464dc5580",
+  "feed": {
+    "publisher": "Municipality of Tirana, Department of Transportation and Road Traffic",
+    "version": "0.2.0",
+    "startDate": "20260101",
+    "endDate": "20261231",
+    "license": "CC-BY-SA-4.0",
+    "attribution": "Schedule data created and provided by Municipality of Tirana, Directorate of Transportation and Road Traffic"
+  },
+  "records": {
+    "agency.txt": 1,
+    "routes.txt": 27,
+    "shapes.txt": 12965,
+    "stop_times.txt": 347070,
+    "stops.txt": 490,
+    "trips.txt": 17474
+  }
+}

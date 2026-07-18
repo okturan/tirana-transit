@@ -1,9 +1,10 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from check_feed_update import FeedCheckError, load_archive, summarize
+from check_feed_update import COUNTED_FILES, FeedCheckError, feed_metadata, load_archive, row_count, summarize
 
 
 class FeedUpdateCheckTest(unittest.TestCase):
@@ -16,7 +17,23 @@ class FeedUpdateCheckTest(unittest.TestCase):
         self.assertFalse(report["changed"])
         self.assertEqual("0.2.0", report["baseline"]["metadata"]["version"])
         self.assertEqual(27, report["baseline"]["counts"]["routes.txt"])
-        self.assertEqual(491, report["baseline"]["counts"]["stops.txt"])
+        self.assertEqual(490, report["baseline"]["counts"]["stops.txt"])
+
+    def test_snapshot_manifest_matches_bundled_archive(self):
+        manifest_path = Path(__file__).with_name("snapshot-manifest.json")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        files, archive_hash = load_archive(self.baseline)
+        metadata = feed_metadata(files)
+
+        self.assertEqual(archive_hash, manifest["archiveSha256"])
+        self.assertEqual(metadata["version"], manifest["feed"]["version"])
+        self.assertEqual(metadata["startDate"], manifest["feed"]["startDate"])
+        self.assertEqual(metadata["endDate"], manifest["feed"]["endDate"])
+        self.assertEqual(metadata["license"], manifest["feed"]["license"])
+        self.assertEqual(
+            {name: row_count(files[name]) for name in COUNTED_FILES},
+            manifest["records"],
+        )
 
     def test_reports_a_changed_feed_version(self):
         with tempfile.TemporaryDirectory() as directory:

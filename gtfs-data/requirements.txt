@@ -1,4 +1,4 @@
-certifi==2026.6.17
+certifi==2026.7.22
 numpy==2.5.1
 pyproj==3.7.2
 Shapely==2.1.2

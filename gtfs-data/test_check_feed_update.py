@@ -15,7 +15,7 @@ class FeedUpdateCheckTest(unittest.TestCase):
         report = summarize(self.baseline, self.baseline, "https://example.invalid/gtfs.zip")
 
         self.assertFalse(report["changed"])
-        self.assertEqual("0.2.0", report["baseline"]["metadata"]["version"])
+        self.assertEqual("2026-08-12", report["baseline"]["metadata"]["version"])
         self.assertEqual(27, report["baseline"]["counts"]["routes.txt"])
         self.assertEqual(490, report["baseline"]["counts"]["stops.txt"])
 
@@ -42,13 +42,13 @@ class FeedUpdateCheckTest(unittest.TestCase):
                 for entry in source.infolist():
                     content = source.read(entry)
                     if entry.filename == "feed_info.txt":
-                        content = content.replace(b",0.2.0,", b",0.3.0,")
+                        content = content.replace(b",2026-08-12,", b",2026-08-13,")
                     target.writestr(entry.filename, content)
 
             report = summarize(self.baseline, candidate, "https://example.invalid/gtfs.zip")
 
         self.assertTrue(report["changed"])
-        self.assertEqual("0.3.0", report["candidate"]["metadata"]["version"])
+        self.assertEqual("2026-08-13", report["candidate"]["metadata"]["version"])
         self.assertEqual(["feed_info.txt"], report["files"]["changed"])
 
     def test_rejects_archive_path_traversal(self):

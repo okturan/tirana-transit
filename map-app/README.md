@@ -20,7 +20,7 @@ Interactive map of public bus routes in Tirana, Albania. It turns the repository
 | Stops | 490 |
 | Trips | 17,474 |
 | Service period | January 2026 to December 2026 |
-| Data source | [Municipality of Tirana GTFS](https://pt.tirana.al/gtfs/gtfs.zip), feed `0.2.0` |
+| Data source | [Municipality of Tirana GTFS](https://pt.tirana.al/gtfs/gtfs.zip), feed `2026-08-12` |
 
 These figures describe the checked-in snapshot, not necessarily the current live network. This is a static schedule map, not live vehicle tracking or a journey planner.
 
